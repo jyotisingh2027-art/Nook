@@ -1,0 +1,11 @@
+[
+  {"id": "winter.hearthlight", "title": "Hearthlight", "category": "Night", "file": "hearthlight.jpg"},
+  {"id": "winter.lakeside-dock", "title": "Lakeside Dock", "category": "Night", "file": "lakeside-dock.jpg"},
+  {"id": "winter.stone-bridge", "title": "Stone Bridge", "category": "Night", "file": "stone-bridge.jpg"},
+  {"id": "winter.violet-dusk", "title": "Violet Dusk", "category": "Dusk", "file": "violet-dusk.jpg"},
+  {"id": "winter.balcony-view", "title": "Balcony View", "category": "Dusk", "file": "balcony-view.jpg"},
+  {"id": "winter.porch-cocoa", "title": "Porch & Cocoa", "category": "Cozy", "file": "porch-cocoa.jpg"},
+  {"id": "winter.fireside", "title": "Fireside", "category": "Cozy", "file": "fireside.jpg"},
+  {"id": "winter.lamplit-lane", "title": "Lamplit Lane", "category": "Village", "file": "lamplit-lane.jpg"},
+  {"id": "winter.village-evening", "title": "Village Evening", "category": "Village", "file": "village-evening.jpg"}
+]
