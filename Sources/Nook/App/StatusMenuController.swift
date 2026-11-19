@@ -20,11 +20,52 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
     private func updateIcon() {
         let paused = Settings.shared.isPaused
         // A single eye; it gets a line through it while the snow is paused.
-        let name = paused ? "eye.slash" : "eye"
-        let image = NSImage(systemSymbolName: name, accessibilityDescription: "Nook")
-        image?.isTemplate = true
-        statusItem.button?.image = image
+        statusItem.button?.image = Self.lashedEye(slashed: paused)
         statusItem.button?.appearsDisabled = paused
+    }
+
+    /// A single eye with lashes, drawn by hand (the system eye symbol has none).
+    static func lashedEye(slashed: Bool) -> NSImage {
+        let image = NSImage(size: NSSize(width: 20, height: 18), flipped: false) { _ in
+            NSColor.black.setStroke()
+            NSColor.black.setFill()
+            // Almond-shaped eye.
+            let eye = NSBezierPath()
+            eye.move(to: NSPoint(x: 2, y: 7))
+            eye.curve(to: NSPoint(x: 18, y: 7), controlPoint1: NSPoint(x: 6, y: 13.5), controlPoint2: NSPoint(x: 14, y: 13.5))
+            eye.curve(to: NSPoint(x: 2, y: 7), controlPoint1: NSPoint(x: 14, y: 0.5), controlPoint2: NSPoint(x: 6, y: 0.5))
+            eye.lineWidth = 1.5
+            eye.lineJoinStyle = .round
+            eye.stroke()
+            // Pupil.
+            NSBezierPath(ovalIn: NSRect(x: 7.4, y: 4.4, width: 5.2, height: 5.2)).fill()
+            // Lashes fanning out from the upper lid.
+            let lashes: [(NSPoint, NSPoint)] = [
+                (NSPoint(x: 4.2, y: 9.6), NSPoint(x: 2.4, y: 12.0)),
+                (NSPoint(x: 7.0, y: 11.2), NSPoint(x: 6.0, y: 14.4)),
+                (NSPoint(x: 10.0, y: 11.8), NSPoint(x: 10.0, y: 15.4)),
+                (NSPoint(x: 13.0, y: 11.2), NSPoint(x: 14.0, y: 14.4)),
+                (NSPoint(x: 15.8, y: 9.6), NSPoint(x: 17.6, y: 12.0)),
+            ]
+            for (a, b) in lashes {
+                let l = NSBezierPath()
+                l.move(to: a); l.line(to: b)
+                l.lineWidth = 1.3
+                l.lineCapStyle = .round
+                l.stroke()
+            }
+            if slashed {
+                let s = NSBezierPath()
+                s.move(to: NSPoint(x: 3, y: 1)); s.line(to: NSPoint(x: 17, y: 16))
+                s.lineWidth = 1.6
+                s.lineCapStyle = .round
+                s.stroke()
+            }
+            return true
+        }
+        image.isTemplate = true
+        image.accessibilityDescription = "Nook"
+        return image
     }
 
     // Rebuild the menu each time it opens so check marks are always current.
