@@ -2,7 +2,7 @@ import AppKit
 
 /// The snowflake icon in the menu bar and its menu.
 final class StatusMenuController: NSObject, NSMenuDelegate {
-    private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+    private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
     private let overlay: OverlayController
     private let menu = NSMenu()
 
@@ -21,6 +21,7 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         let paused = Settings.shared.isPaused
         // The two eyes from the Nook logo; they close while Nook is paused.
         statusItem.button?.image = Self.logoEyes(closed: paused)
+        statusItem.button?.imageScaling = .scaleNone
         statusItem.button?.appearsDisabled = paused
     }
 
