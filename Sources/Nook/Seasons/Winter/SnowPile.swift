@@ -3,6 +3,7 @@ import SpriteKit
 enum SurfaceKey: Hashable {
     case window(CGWindowID)
     case dock
+    case ground   // the bottom edge of the screen
 }
 
 /// A strip of settled snow along the top edge of a window or the Dock.
@@ -20,6 +21,9 @@ final class SnowPile {
     private static let columnsPerMound = 3
     private static let moundWidth: CGFloat = 15
     var maxHeight: CGFloat
+    /// Real snow drifts: each pile has its own pattern of humps and dips, so some
+    /// spots pile up high while others stay low.
+    private let driftPhases: (CGFloat, CGFloat, CGFloat, CGFloat)
     private(set) var hiddenColumns = IndexSet()   // covered by a window in front
     private(set) var dirty = true
 
@@ -33,6 +37,13 @@ final class SnowPile {
     /// texture, so the graphics chip draws a whole pile in a single cheap step.
     let node = SKNode()
     private var mounds: [SKSpriteNode] = []
+    private var moundWidths: [Int: CGFloat] = [:]
+
+    /// A repeatable 0…1 number for mound `k`.
+    private static func hash(_ k: Int, _ seed: CGFloat) -> CGFloat {
+        let v = sin(CGFloat(k) * 12.9898 + seed * 78.233) * 43758.5453
+        return v - floor(v)
+    }
 
     var width: CGFloat { CGFloat(heights.count) * SnowPile.columnWidth }
     var isEmpty: Bool { heights.allSatisfy { $0 < 0.2 } }
@@ -42,6 +53,8 @@ final class SnowPile {
         self.heights = Array(repeating: 0, count: max(1, Int(width / SnowPile.columnWidth)))
         self.origin = origin
         self.maxHeight = maxHeight
+        self.driftPhases = (CGFloat.random(in: 0...(2 * .pi)), CGFloat.random(in: 0...(2 * .pi)),
+                            CGFloat.random(in: 0...(2 * .pi)), CGFloat.random(in: 0.8...1.25))
         node.position = origin
         node.zPosition = 10
         rebuildMounds()
@@ -75,16 +88,39 @@ final class SnowPile {
         }
         let step = CGFloat(SnowPile.columnsPerMound) * SnowPile.columnWidth
         for (k, m) in mounds.enumerated() {
-            m.position = CGPoint(x: (CGFloat(k) + 0.5) * step, y: -1.5)
+            // Each mound gets its own width and a small nudge, so the edge looks like real
+            // lumpy snow instead of a neat row of scallops.
+            let r1 = SnowPile.hash(k, driftPhases.0), r2 = SnowPile.hash(k, driftPhases.1)
+            moundWidths[k] = SnowPile.moundWidth * (0.85 + r1 * 1.1)
+            m.position = CGPoint(x: (CGFloat(k) + 0.5) * step + (r2 - 0.5) * 4, y: -1.5)
         }
         dirty = true
     }
 
-    /// The tallest the snow may be at a column. It thins out toward the rounded window corners.
+    /// How deep the snow likes to be at a column: about 0.3 in the dips up to 1.5 on the drifts.
+    func drift(_ i: Int) -> CGFloat {
+        let x = CGFloat(i) * SnowPile.columnWidth
+        let (a, b, c, scale) = driftPhases
+        let v = 0.85
+            + 0.48 * sin(x / (30 * scale) + a)
+            + 0.24 * sin(x / (11.5 * scale) + b)
+            + 0.09 * sin(x / 4.6 + c)
+        return min(1.7, max(0.2, v))
+    }
+
+    /// The tallest the snow may be at a column. It follows the drift pattern and thins out
+    /// toward the rounded window corners.
     func cap(_ i: Int) -> CGFloat {
         let edge = CGFloat(min(i, heights.count - 1 - i)) * SnowPile.columnWidth
         let t = min(1, max(0, edge / 16))
-        return maxHeight * (t * t * (3 - 2 * t))
+        return maxHeight * (t * t * (3 - 2 * t)) * drift(i)
+    }
+
+    /// How full the snow is overall (0 = bare, 1 = as deep as it can get).
+    var fullness: CGFloat {
+        var have: CGFloat = 0, room: CGFloat = 0
+        for i in heights.indices { have += heights[i]; room += cap(i) }
+        return room > 0 ? have / room : 0
     }
 
     func column(forLocalX x: CGFloat) -> Int? {
@@ -108,7 +144,8 @@ final class SnowPile {
             guard j >= 0 && j < heights.count else { continue }
             let room = cap(j) - heights[j]
             if room > 0 {
-                heights[j] += min(room, amount * w)
+                // Snow catches more on the drifts than in the dips.
+                heights[j] += min(room, amount * w * (0.45 + 0.55 * drift(j)))
                 added = true
             }
         }
@@ -119,8 +156,7 @@ final class SnowPile {
     /// Gives every column a thin, slightly uneven dusting (used when Nook starts).
     func dust(_ amount: CGFloat) {
         for i in heights.indices {
-            let wobble = 0.75 + 0.5 * CGFloat(sin(Double(i) * 0.37) * 0.5 + 0.5)
-            heights[i] = min(cap(i), amount * wobble)
+            heights[i] = min(cap(i), amount * drift(i))
         }
         dirty = true
     }
@@ -128,7 +164,7 @@ final class SnowPile {
     /// Lets the snow settle so it doesn't form spikes.
     func relax() {
         guard heights.count > 2 else { return }
-        let limit: CGFloat = 0.9
+        let limit: CGFloat = 1.3
         for _ in 0..<2 {
             for i in 0..<(heights.count - 1) {
                 let d = heights[i] - heights[i + 1]
@@ -148,6 +184,17 @@ final class SnowPile {
         for i in range where i >= 0 && i < heights.count {
             total += heights[i]
             heights[i] = 0
+        }
+        if total > 0 { dirty = true }
+        return total
+    }
+
+    /// Lowers snow on a range of columns to `keep` and returns how much was removed.
+    func scoop(columns range: Range<Int>, keep: CGFloat) -> CGFloat {
+        var total: CGFloat = 0
+        for i in range where i >= 0 && i < heights.count && heights[i] > keep {
+            total += heights[i] - keep
+            heights[i] = keep
         }
         if total > 0 { dirty = true }
         return total
@@ -176,7 +223,7 @@ final class SnowPile {
             } else {
                 m.isHidden = false
                 anyVisible = true
-                m.size = CGSize(width: SnowPile.moundWidth, height: h + 2.5)
+                m.size = CGSize(width: moundWidths[k] ?? SnowPile.moundWidth, height: h + 2.5)
             }
         }
     }

@@ -78,6 +78,12 @@ final class Settings {
         set { defaults.set(newValue, forKey: "paused"); changed() }
     }
 
+    /// Reindeer, bunnies and the snow shoveller who wander by.
+    var visitorsOn: Bool {
+        get { !defaults.bool(forKey: "visitorsOff") }
+        set { defaults.set(!newValue, forKey: "visitorsOff"); changed() }
+    }
+
     private func changed() {
         NotificationCenter.default.post(name: Settings.didChange, object: self)
     }

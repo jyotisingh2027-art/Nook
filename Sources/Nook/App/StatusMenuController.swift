@@ -190,6 +190,11 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         clear.isEnabled = !settings.isPaused
         menu.addItem(clear)
 
+        let visitors = NSMenuItem(title: "Winter Visitors (reindeer, bunnies, snow shoveller)", action: #selector(toggleVisitors), keyEquivalent: "")
+        visitors.target = self
+        visitors.state = settings.visitorsOn ? .on : .off
+        menu.addItem(visitors)
+
         menu.addItem(.separator())
 
         let pause = NSMenuItem(title: settings.isPaused ? "Resume Snow" : "Pause Snow", action: #selector(togglePause), keyEquivalent: "")
@@ -258,6 +263,7 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
     @objc private func restoreWallpaper() { WallpaperManager.shared.restoreOriginal() }
 
     @objc private func clearSnow() { overlay.brushAllSnowOff() }
+    @objc private func toggleVisitors() { Settings.shared.visitorsOn.toggle() }
 
     @objc private func togglePause() { Settings.shared.isPaused.toggle() }
 

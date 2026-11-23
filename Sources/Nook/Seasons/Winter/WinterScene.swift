@@ -45,8 +45,9 @@ final class WinterScene: SeasonScene {
 
     // MARK: - Tuning
 
-    private let windowSnowMax: CGFloat = 11
-    private let dockSnowMax: CGFloat = 8
+    private let windowSnowMax: CGFloat = 12
+    private let dockSnowMax: CGFloat = 9
+    private let groundSnowMax: CGFloat = 13
     private let gravity: CGFloat = 650
     private let maxChunks = 450
 
@@ -74,12 +75,20 @@ final class WinterScene: SeasonScene {
     private let flakeLayer = SKNode()
     private let pileLayer = SKNode()
     private let chunkLayer = SKNode()
+    private let visitors = WinterVisitors()
 
     override init(screenFrame: CGRect, visibleTop: CGFloat) {
         super.init(screenFrame: screenFrame, visibleTop: visibleTop)
         addChild(pileLayer)
+        addChild(visitors.layer)
         addChild(chunkLayer)
         addChild(flakeLayer)
+
+        visitors.piles = { [unowned self] in self.piles }
+        visitors.isCovered = { [unowned self] p in self.insideWindow(p) }
+        visitors.throwSnow = { [unowned self] p, v, size, passThrough in
+            self.spawnChunk(at: p, velocity: v, size: size, ignore: passThrough, ignoreTime: passThrough == nil ? 0 : 2.5)
+        }
     }
 
     required init?(coder aDecoder: NSCoder) { fatalError("not used") }
@@ -145,6 +154,7 @@ final class WinterScene: SeasonScene {
         flakeLayer.isHidden = !weatherVisible
         pileLayer.isHidden = !weatherVisible
         chunkLayer.isHidden = !weatherVisible
+        visitors.layer.isHidden = !weatherVisible
     }
 
     override func update(_ currentTime: TimeInterval) {
@@ -183,6 +193,7 @@ final class WinterScene: SeasonScene {
         }
 
         updateChunks(dt)
+        visitors.step(dt: dt, visibleTop: visibleTop)
 
         settleTimer += Double(dt)
         if settleTimer > 0.1 {
@@ -303,6 +314,7 @@ final class WinterScene: SeasonScene {
             switch event {
             case .moved(let id, let velocity):
                 if let p = piles[.window(id)] { shed(p, style: .thrown(velocity)) }
+                visitors.surfaceShaken(.window(id), velocity: velocity)
             case .resized(let id):
                 if let p = piles[.window(id)] { shed(p, style: .crumble) }
             case .closed(let id):
@@ -346,6 +358,13 @@ final class WinterScene: SeasonScene {
             newSurfaces.append(s)
             live.insert(s.key)
         }
+
+        // Snow also settles along the bottom of the screen, behind every window and the Dock.
+        let groundBlocked = inFront.filter { $0.minY < groundSnowMax * 1.6 && $0.maxY > 0 }.map { $0.minX...$0.maxX }
+        let ground = Surface(key: .ground, minX: 0, maxX: size.width, y: 0, blocked: groundBlocked)
+        upsertPile(for: ground, maxHeight: groundSnowMax)
+        newSurfaces.append(ground)
+        live.insert(.ground)
 
         for (key, pile) in Array(piles) where !live.contains(key) {
             piles[key] = nil

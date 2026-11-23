@@ -11,6 +11,16 @@ if let i = CommandLine.arguments.firstIndex(of: "--render-panel"), i + 2 < Comma
     exit(0)
 }
 
+if let i = CommandLine.arguments.firstIndex(of: "--render-visitors"), i + 1 < CommandLine.arguments.count {
+    VisitorArt.renderSheet(to: CommandLine.arguments[i + 1])
+    exit(0)
+}
+
+if let i = CommandLine.arguments.firstIndex(of: "--render-winter"), i + 1 < CommandLine.arguments.count {
+    WinterPreview.render(to: CommandLine.arguments[i + 1])
+    exit(0)
+}
+
 let app = NSApplication.shared
 let appDelegate = AppDelegate()
 app.delegate = appDelegate
