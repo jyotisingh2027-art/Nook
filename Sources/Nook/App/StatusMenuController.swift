@@ -63,7 +63,9 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         menu.removeAllItems()
         let settings = Settings.shared
 
-        let header = NSMenuItem(title: settings.mode == .cozy ? "Nook · Winter" : "Nook · Winter · \(settings.mode.title)",
+        let headerText = settings.mode == .cozy ? "Nook · Winter"
+            : (settings.mode.isGame ? "Nook · \(settings.gamePaused ? "Paused" : "Playing") \(settings.mode.title)" : "Nook · Winter · \(settings.mode.title)")
+        let header = NSMenuItem(title: headerText,
                                 action: nil, keyEquivalent: "")
         header.isEnabled = false
         menu.addItem(header)
@@ -72,7 +74,7 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         // Mode
         let modeItem = NSMenuItem(title: "Mode", action: nil, keyEquivalent: "")
         let modeMenu = NSMenu()
-        for mode in AppMode.allCases {
+        for mode in AppMode.allCases where !mode.isGame {
             let title = mode.isAvailable ? mode.title : "\(mode.title) (coming soon)"
             let item = NSMenuItem(title: title, action: mode.isAvailable ? #selector(pickMode(_:)) : nil, keyEquivalent: "")
             item.target = self
@@ -84,10 +86,38 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         modeItem.submenu = modeMenu
         menu.addItem(modeItem)
 
+        // Play Game
+        let gameItem = NSMenuItem(title: "Play Game", action: nil, keyEquivalent: "")
+        let gameMenu = NSMenu()
+        for mode in AppMode.allCases where mode.isGame {
+            let item = NSMenuItem(title: mode.title, action: #selector(pickMode(_:)), keyEquivalent: "")
+            item.target = self
+            item.representedObject = mode.rawValue
+            item.state = settings.mode == mode ? .on : .off
+            gameMenu.addItem(item)
+        }
+        if settings.mode.isGame {
+            gameMenu.addItem(.separator())
+            let pause = NSMenuItem(title: settings.gamePaused ? "Resume Game" : "Pause Game",
+                                   action: #selector(toggleGamePause), keyEquivalent: "")
+            pause.target = self
+            pause.image = NSImage(systemSymbolName: settings.gamePaused ? "play.fill" : "pause.fill", accessibilityDescription: nil)
+            gameMenu.addItem(pause)
+            let end = NSMenuItem(title: "End Game", action: #selector(endGame), keyEquivalent: "")
+            end.target = self
+            end.image = NSImage(systemSymbolName: "stop.fill", accessibilityDescription: nil)
+            gameMenu.addItem(end)
+        }
+        gameItem.submenu = gameMenu
+        menu.addItem(gameItem)
+
         // Catch the Gift score
         if settings.mode == .catchGift {
             let stats = GiftStats.shared
-            var lines = ["Gifts caught: \(stats.caught)   ·   Best streak: \(stats.bestStreak)"]
+            let hearts = String(repeating: "♥︎", count: stats.lives) + String(repeating: "♡", count: GiftStats.maxLives - stats.lives)
+            var lines = [stats.inGame ? "Score: \(stats.score)   ·   Lives: \(hearts)   ·   Best game: \(stats.bestGame)"
+                                      : "Best game: \(stats.bestGame)",
+                         "All-time gifts caught: \(stats.caught)   ·   Best streak: \(stats.bestStreak)"]
             if let left = stats.catchesToNextUnlock {
                 lines.append(left == 1 ? "Next surprise: 1 more catch" : "Next surprise: \(left) more catches")
             } else {
@@ -256,6 +286,16 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
     @objc private func restoreWallpaper() { WallpaperManager.shared.restoreOriginal() }
 
     @objc private func clearSnow() { overlay.brushAllSnowOff() }
+    @objc private func toggleGamePause() { Settings.shared.gamePaused.toggle() }
+
+    /// Ends the game now. Catch the Gift shows your scores, just like running out of lives.
+    @objc private func endGame() {
+        let wasGift = Settings.shared.mode == .catchGift
+        let result = wasGift ? GiftStats.shared.endGame() : nil
+        Settings.shared.mode = .cozy
+        if let result { GameOverController.shared.show(result) }
+    }
+
     @objc private func toggleVisitors() { Settings.shared.visitorsOn.toggle() }
 
     @objc private func togglePause() { Settings.shared.isPaused.toggle() }

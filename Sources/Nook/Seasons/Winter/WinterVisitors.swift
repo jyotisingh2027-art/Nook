@@ -92,7 +92,7 @@ final class WinterVisitors {
 
     private func spawnAnimal(_ piles: [SurfaceKey: SnowPile], visibleTop: CGFloat) {
         if Double.random(in: 0...1) < 0.6 {
-            guard let pile = pick(usablePiles(piles, minWidth: 260, headroom: 70, visibleTop: visibleTop)) else { return }
+            guard let pile = pick(usablePiles(piles, minWidth: 300, headroom: 100, visibleTop: visibleTop)) else { return }
             let dir: CGFloat = Bool.random() ? 1 : -1
             let roll = Double.random(in: 0...1)
             let gait: Visitor.Gait = roll < 0.35 ? .walk : (roll < 0.65 ? .run : .wander)
@@ -105,20 +105,20 @@ final class WinterVisitors {
             // Sometimes a youngster tags along behind.
             if Double.random(in: 0...1) < 0.3 {
                 let young = Visitor(kind: .reindeer(young: true), key: pile.key, pile: pile, dir: dir, gait: gait)
-                young.startDelay = 58 / young.speed
+                young.startDelay = 58 * VisitorArt.displayScale / young.speed
                 young.stopAt = adult.stopAt
                 young.pauseLength = pause
                 add(young, size: CGSize(width: VisitorArt.reindeerSize.width * 0.72, height: VisitorArt.reindeerSize.height * 0.72))
             }
         } else {
-            guard let pile = pick(usablePiles(piles, minWidth: 140, headroom: 34, visibleTop: visibleTop)) else { return }
+            guard let pile = pick(usablePiles(piles, minWidth: 160, headroom: 50, visibleTop: visibleTop)) else { return }
             let v = Visitor(kind: .bunny, key: pile.key, pile: pile, dir: Bool.random() ? 1 : -1, gait: .walk)
             add(v, size: VisitorArt.bunnyDisplaySize)
         }
     }
 
     private func spawnShovellerIfNeeded(_ piles: [SurfaceKey: SnowPile], visibleTop: CGFloat) {
-        let deep = usablePiles(piles, minWidth: 150, headroom: 56, visibleTop: visibleTop)
+        let deep = usablePiles(piles, minWidth: 170, headroom: 80, visibleTop: visibleTop)
             .filter { $0.fullness > (demo ? 0.15 : 0.55) }
             .max { $0.fullness < $1.fullness }
         guard let pile = deep else { return }
@@ -128,7 +128,7 @@ final class WinterVisitors {
     }
 
     private func add(_ v: Visitor, size: CGSize) {
-        v.node.size = size
+        v.node.size = CGSize(width: size.width * VisitorArt.displayScale, height: size.height * VisitorArt.displayScale)
         v.node.anchorPoint = CGPoint(x: 0.5, y: 0)
         v.node.zPosition = 18          // behind the snow surface, so feet sink in a little
         v.node.alpha = 0
@@ -278,7 +278,7 @@ final class WinterVisitors {
                 v.workT = 0
                 if amount > 0.5 {
                     let n = min(4, 1 + Int(amount / 14))
-                    let from = CGPoint(x: v.pos.x - v.dir * 12, y: v.pos.y + 44)
+                    let from = CGPoint(x: v.pos.x - v.dir * 12, y: v.pos.y + 44 * VisitorArt.displayScale)
                     for _ in 0..<n {
                         let size = min(8, max(3, sqrt(amount / CGFloat(n)) * 1.5))
                         throwSnow(CGPoint(x: from.x + CGFloat.random(in: -3...3), y: from.y),
@@ -304,7 +304,7 @@ final class WinterVisitors {
     }
 
     private func kickSnow(_ v: Visitor, pile: SnowPile, strength: CGFloat) {
-        let i = Int((v.u - v.dir * 14) / SnowPile.columnWidth)
+        let i = Int((v.u - v.dir * 14 * VisitorArt.displayScale) / SnowPile.columnWidth)
         guard i >= 1, i < pile.heights.count - 1, pile.heights[i] > 2 else { return }
         let taken = pile.scoop(columns: (i - 1)..<(i + 2), keep: pile.heights[i] - 1.2 * strength)
         guard taken > 0.3 else { return }

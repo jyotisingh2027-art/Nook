@@ -45,9 +45,9 @@ final class WinterScene: SeasonScene {
 
     // MARK: - Tuning
 
-    private let windowSnowMax: CGFloat = 12
-    private let dockSnowMax: CGFloat = 9
-    private let groundSnowMax: CGFloat = 13
+    private let windowSnowMax: CGFloat = 20
+    private let dockSnowMax: CGFloat = 22
+    private let groundSnowMax: CGFloat = 20
     private let gravity: CGFloat = 650
     private let maxChunks = 450
 
@@ -170,7 +170,7 @@ final class WinterScene: SeasonScene {
         let w = size.width
         let speed = CGFloat(snowSpeed)
         // More and faster flakes means more landings; keep the pile-up pace steady.
-        let landAmount = CGFloat(0.32 * snowBuildUp / (snowDensity * snowSpeed))
+        let landAmount = CGFloat(0.6 * snowBuildUp / (snowDensity * snowSpeed))
 
         for i in flakes.indices {
             var f = flakes[i]
@@ -381,7 +381,7 @@ final class WinterScene: SeasonScene {
         // When Nook starts, give everything a light dusting so the effect is visible right away.
         if !hasDusted && !piles.isEmpty {
             hasDusted = true
-            piles.values.forEach { $0.dust(2.5) }
+            piles.values.forEach { $0.dust(5) }
         }
     }
 

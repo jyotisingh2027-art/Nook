@@ -39,7 +39,7 @@ final class GiftLayer: SKNode {
         init(pos: CGPoint, targetID: Int, homeX: CGFloat) {
             self.pos = pos; self.targetID = targetID; self.homeX = homeX
         }
-        var bodyCentre: CGPoint { CGPoint(x: pos.x, y: pos.y + 6) }
+        var bodyCentre: CGPoint { CGPoint(x: pos.x, y: pos.y + 8) }
     }
 
     private var imp: Imp?
@@ -82,7 +82,7 @@ final class GiftLayer: SKNode {
         let colour = Self.boxColours.randomElement()!
         let ribbon = Self.ribbonColours.filter { $0 != colour }.randomElement()!
         let art = DecorationRenderer.shared.render(
-            PlacedDecoration(kind: .giftBox, x: 0, y: 0, scale: 0.6,
+            PlacedDecoration(kind: .giftBox, x: 0, y: 0, scale: 0.82,
                              options: ["color": colour, "ribbon": ribbon], seed: 1))
 
         let node = SKNode()
@@ -98,8 +98,8 @@ final class GiftLayer: SKNode {
         box.size = art.size
         node.addChild(box)
 
-        // Speeds up a little while you keep a streak going, so it stays interesting.
-        let streakBoost = CGFloat(min(GiftStats.shared.streak, 15)) * 4
+        // The more you've caught this game, the faster gifts fall.
+        let streakBoost = CGFloat(min(GiftStats.shared.score, 40)) * 3.5
         let margin = art.size.width
         let start = CGPoint(x: CGFloat.random(in: margin...(size.width - margin)),
                             y: size.height + art.size.height)
@@ -121,7 +121,21 @@ final class GiftLayer: SKNode {
 
     // MARK: - Every frame
 
+    /// While the game is paused everything holds still and can't be clicked.
+    var isFrozen = false {
+        didSet {
+            guard oldValue != isFrozen else { return }
+            isPaused = isFrozen       // stops the glow and other little animations too
+            lastTime = 0
+            if isFrozen && hudVisible && GiftStats.shared.inGame, let s = scene {
+                floatText("Paused", at: CGPoint(x: s.size.width / 2, y: s.size.height * 0.6), size: 26, hold: 0.8)
+            }
+        }
+    }
+
     func step(_ now: CFTimeInterval) {
+        refreshHUD()
+        if isFrozen { return }
         guard isActive, !gifts.isEmpty || imp != nil else { lastTime = 0; return }
         let dt = CGFloat(lastTime == 0 ? 1.0 / 30.0 : min(0.1, max(0.001, now - lastTime)))
         lastTime = now
@@ -163,7 +177,7 @@ final class GiftLayer: SKNode {
                     let fromLeft = g.pos.x < w / 2
                     let homeX: CGFloat = fromLeft ? -50 : w + 50
                     let i = Imp(pos: CGPoint(x: homeX, y: max(90, g.pos.y - 150)), targetID: g.id, homeX: homeX)
-                    i.node.size = FrostImpArt.size
+                    i.node.size = CGSize(width: FrostImpArt.size.width * 1.4, height: FrostImpArt.size.height * 1.4)
                     i.node.zPosition = 1
                     i.node.position = i.pos
                     addChild(i.node)
@@ -181,7 +195,7 @@ final class GiftLayer: SKNode {
                 imp.state = .leaving
                 return
             }
-            let target = CGPoint(x: g.pos.x, y: g.pos.y - 34)
+            let target = CGPoint(x: g.pos.x, y: g.pos.y - 46)
             let dx = target.x - imp.pos.x, dy = target.y - imp.pos.y
             let d = max(0.001, hypot(dx, dy))
             let speed: CGFloat = (100 + CGFloat(min(GiftStats.shared.streak, 10)) * 4) * (energySaving ? 0.9 : 1)
@@ -195,7 +209,7 @@ final class GiftLayer: SKNode {
             imp.pos.y += 40 * dt
             imp.node.texture = FrostImpArt.texture(.grab)
             if var c = imp.carried {
-                c.pos = CGPoint(x: imp.pos.x, y: imp.pos.y + 38 + bob)
+                c.pos = CGPoint(x: imp.pos.x, y: imp.pos.y + 52 + bob)
                 c.node.position = c.pos
                 imp.carried = c
             }
@@ -228,6 +242,7 @@ final class GiftLayer: SKNode {
         imp.state = .escaping
         imp.node.xScale = imp.homeX < 0 ? -1 : 1
         GiftStats.shared.recordStolen()
+        lifeLostText(at: CGPoint(x: imp.pos.x, y: imp.pos.y + 100))
         floatText("Hehehe! Stolen!", at: CGPoint(x: imp.pos.x, y: imp.pos.y + 70), size: 20)
     }
 
@@ -250,7 +265,7 @@ final class GiftLayer: SKNode {
 
     private func impHit(_ p: CGPoint) -> Imp? {
         guard let imp, imp.state != .shooed else { return nil }
-        return hypot(p.x - imp.bodyCentre.x, p.y - imp.bodyCentre.y) < 32 ? imp : nil
+        return hypot(p.x - imp.bodyCentre.x, p.y - imp.bodyCentre.y) < 44 ? imp : nil
     }
 
     private func floorY(at x: CGFloat) -> CGFloat {
@@ -263,16 +278,19 @@ final class GiftLayer: SKNode {
         g.box.run(.rotate(toAngle: 0, duration: 0.2))
         g.node.run(.sequence([.wait(forDuration: 1.4), .fadeOut(withDuration: 0.8), .removeFromParent()]))
         GiftStats.shared.recordMiss()
+        lifeLostText(at: CGPoint(x: g.pos.x, y: g.pos.y + 40))
     }
 
     // MARK: - Catching
 
     func hitTest(_ p: CGPoint) -> Bool {
-        impHit(p) != nil || gifts.contains { hypot(p.x - $0.pos.x, p.y - $0.pos.y) < $0.radius }
+        guard !isFrozen else { return false }
+        return impHit(p) != nil || gifts.contains { hypot(p.x - $0.pos.x, p.y - $0.pos.y) < $0.radius }
     }
 
     /// Catches the gift under the point, if there is one.
     func catchGift(at p: CGPoint) -> Bool {
+        guard !isFrozen else { return false }
         if isActive, let imp = impHit(p) {
             shoo(imp)
             return true
@@ -296,6 +314,81 @@ final class GiftLayer: SKNode {
             floatText("Surprise unlocked: \(kind.title)!", at: CGPoint(x: g.pos.x, y: g.pos.y + 66), size: 24, hold: 2.2)
         }
         return true
+    }
+
+    // MARK: - Lives and score on screen
+
+    /// Shown on one screen only (the one with the menu bar) while a game is on.
+    var hudVisible = false
+    private let hud = SKNode()
+    private var hearts: [SKSpriteNode] = []
+    private var scoreLabels: [SKLabelNode] = []
+    private var shownLives = -1, shownScore = -1
+
+    private func buildHUD() {
+        guard hearts.isEmpty else { return }
+        hud.zPosition = 5
+        addChild(hud)
+        for i in 0..<GiftStats.maxLives {
+            let h = SKSpriteNode(texture: HeartArt.full)
+            h.size = CGSize(width: 26, height: 24)
+            h.position = CGPoint(x: CGFloat(i - 1) * 32, y: 0)
+            hud.addChild(h)
+            hearts.append(h)
+        }
+        for (offset, colour, alpha) in [(CGPoint(x: 1.2, y: -1.2), NSColor.black, 0.45), (.zero, NSColor.white, 1.0)] as [(CGPoint, NSColor, CGFloat)] {
+            let l = SKLabelNode(text: "")
+            l.fontName = "AvenirNext-Bold"
+            l.fontSize = 17
+            l.fontColor = colour
+            l.alpha = alpha
+            l.verticalAlignmentMode = .center
+            l.position = CGPoint(x: offset.x, y: -30 + offset.y)
+            hud.addChild(l)
+            scoreLabels.append(l)
+        }
+    }
+
+    private func refreshHUD() {
+        let stats = GiftStats.shared
+        let show = hudVisible && isActive && stats.inGame
+        if !show {
+            if !hud.isHidden { hud.isHidden = true }
+            return
+        }
+        buildHUD()
+        hud.isHidden = false
+        if let s = scene as? SeasonScene {
+            hud.position = CGPoint(x: s.size.width / 2, y: s.visibleTop - 34)
+        }
+        if stats.lives != shownLives {
+            let lost = shownLives > stats.lives && shownLives >= 0
+            shownLives = stats.lives
+            for (i, h) in hearts.enumerated() {
+                h.texture = i < stats.lives ? HeartArt.full : HeartArt.empty
+            }
+            if lost, stats.lives < hearts.count {
+                let h = hearts[stats.lives]
+                h.run(.sequence([.scale(to: 1.5, duration: 0.12), .scale(to: 1, duration: 0.25)]))
+            }
+        }
+        if stats.score != shownScore {
+            shownScore = stats.score
+            scoreLabels.forEach { $0.text = "Score \(stats.score)" }
+        }
+    }
+
+    private func lifeLostText(at p: CGPoint) {
+        guard GiftStats.shared.inGame || GiftStats.shared.lives == 0 else { return }
+        let left = GiftStats.shared.lives
+        let text = left == 0 ? "No lives left!" : (left == 1 ? "−1 life  ·  last one!" : "−1 life  ·  \(left) left")
+        floatText(text, at: p, size: 18, hold: 0.8)
+    }
+
+    /// A little "Ready? 3 lives. Go!" when a game starts.
+    func announceStart() {
+        guard let s = scene as? SeasonScene else { return }
+        floatText("Catch the Gift!  3 lives.  Go!", at: CGPoint(x: s.size.width / 2, y: s.size.height * 0.6), size: 26, hold: 1.4)
     }
 
     // MARK: - Effects

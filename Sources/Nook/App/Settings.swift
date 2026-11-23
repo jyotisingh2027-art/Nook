@@ -52,6 +52,9 @@ enum AppMode: String, CaseIterable {
         }
     }
 
+    /// Games live under "Play Game" in the menu; the rest under "Mode".
+    var isGame: Bool { self == .catchGift || self == .snowballFight }
+
     /// Modes become available as they are built.
     var isAvailable: Bool { self != .focus }
 }
@@ -70,7 +73,7 @@ final class Settings {
 
     var mode: AppMode {
         get { AppMode(rawValue: defaults.string(forKey: "mode") ?? "") ?? .cozy }
-        set { defaults.set(newValue.rawValue, forKey: "mode"); changed() }
+        set { gamePaused = false; defaults.set(newValue.rawValue, forKey: "mode"); changed() }
     }
 
     var isPaused: Bool {
@@ -82,6 +85,11 @@ final class Settings {
     var visitorsOn: Bool {
         get { !defaults.bool(forKey: "visitorsOff") }
         set { defaults.set(!newValue, forKey: "visitorsOff"); changed() }
+    }
+
+    /// The current game is paused (not saved: a game never stays paused after Nook restarts).
+    var gamePaused = false {
+        didSet { if oldValue != gamePaused { changed() } }
     }
 
     private func changed() {

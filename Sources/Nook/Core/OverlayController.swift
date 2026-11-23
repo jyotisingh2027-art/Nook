@@ -121,6 +121,11 @@ final class OverlayController: WindowTrackerObserver {
             self?.scheduleRebuild()
         }
         nc.addObserver(forName: Settings.didChange, object: nil, queue: .main) { [weak self] _ in self?.applySettings() }
+        nc.addObserver(forName: GiftStats.gameOver, object: nil, queue: .main) { note in
+            // Out of lives: stop the game and show the scores.
+            Settings.shared.mode = .cozy
+            if let result = note.object as? GiftStats.GameResult { GameOverController.shared.show(result) }
+        }
         nc.addObserver(forName: PowerMonitor.didChange, object: nil, queue: .main) { [weak self] _ in self?.applyEnergySettings() }
         for name in [DecorationStore.didChange, DecorationEditorController.visibilityChanged] {
             nc.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in self?.decorationsChanged() }
@@ -165,6 +170,8 @@ final class OverlayController: WindowTrackerObserver {
             o.scene.snowBuildUp = amount.buildUp
             o.scene.giftLayer.isActive = giftsOn
             o.scene.snowballLayer.isActive = snowballsOn
+            o.scene.giftLayer.isFrozen = Settings.shared.gamePaused
+            o.scene.snowballLayer.isFrozen = Settings.shared.gamePaused
         }
         updateModeTimer()
         updateRunState()
@@ -180,6 +187,15 @@ final class OverlayController: WindowTrackerObserver {
         let mode: AppMode? = giftsOn ? .catchGift : (snowballsOn ? .snowballFight : nil)
         guard mode != timerMode else { return }
         timerMode = mode
+        // A new game of Catch the Gift starts with 3 lives. Pausing and resuming keeps the game going;
+        // switching to another mode ends it.
+        if Settings.shared.mode != .catchGift { GiftStats.shared.abandonGame() }
+        let main = overlays.first { $0.screen == NSScreen.screens.first } ?? overlays.first
+        for o in overlays { o.scene.giftLayer.hudVisible = o.scene === main?.scene }
+        if mode == .catchGift && !GiftStats.shared.inGame {
+            GiftStats.shared.startGame()
+            main?.scene.giftLayer.announceStart()
+        }
         modeTimer?.invalidate()
         modeTimer = nil
         guard let mode else { updateMouseCapture(); return }
@@ -198,6 +214,11 @@ final class OverlayController: WindowTrackerObserver {
 
     private func modeTick() {
         let now = CACurrentMediaTime()
+        if Settings.shared.gamePaused {
+            // Nothing new appears while paused; push the next arrival back so it doesn't come instantly.
+            nextSpawnAt = max(nextSpawnAt, now + 1.5)
+            return
+        }
         if now >= nextSpawnAt {
             // Something new appears on one screen that's awake and showing, chosen at random.
             let ready = overlays.filter { !$0.view.isPaused && $0.window.isVisible }
@@ -207,7 +228,8 @@ final class OverlayController: WindowTrackerObserver {
                 wait = Double.random(in: 4...9)
             } else {
                 ready.randomElement()?.scene.dropGift()
-                wait = Double.random(in: 6...14)
+                // Gifts come more often as your score climbs.
+                wait = Double.random(in: 4.5...8) * max(0.28, pow(0.94, Double(GiftStats.shared.score)))
             }
             nextSpawnAt = now + wait * (PowerMonitor.shared.shouldSaveEnergy ? 1.5 : 1)
         }

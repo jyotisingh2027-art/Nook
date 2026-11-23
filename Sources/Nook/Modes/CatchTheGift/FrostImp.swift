@@ -13,7 +13,7 @@ enum FrostImpArt {
 
     static func texture(_ pose: Pose) -> SKTexture {
         if let t = cache[pose] { return t }
-        let s: CGFloat = 2
+        let s: CGFloat = 3
         let ctx = CGContext(data: nil, width: Int(size.width * s), height: Int(size.height * s), bitsPerComponent: 8, bytesPerRow: 0,
                             space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
         ctx.scaleBy(x: s, y: s)
@@ -171,5 +171,38 @@ enum FrostImpPreview {
             ctx.draw(img, in: CGRect(x: (i % 3) * w, y: (1 - i / 3) * h, width: w, height: h))
         }
         try? NSBitmapImageRep(cgImage: ctx.makeImage()!).representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: path))
+    }
+}
+
+/// Hearts for the lives counter.
+enum HeartArt {
+    static let full = make(filled: true)
+    static let empty = make(filled: false)
+
+    private static func make(filled: Bool) -> SKTexture {
+        let w: CGFloat = 52, h: CGFloat = 48
+        let ctx = CGContext(data: nil, width: Int(w), height: Int(h), bitsPerComponent: 8, bytesPerRow: 0,
+                            space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+        let path = CGMutablePath()
+        path.move(to: CGPoint(x: w / 2, y: 5))
+        path.addCurve(to: CGPoint(x: 4, y: 30), control1: CGPoint(x: 18, y: 15), control2: CGPoint(x: 4, y: 20))
+        path.addArc(center: CGPoint(x: 15, y: 32), radius: 11.2, startAngle: .pi * 1.08, endAngle: 0.15, clockwise: true)
+        path.addArc(center: CGPoint(x: 37, y: 32), radius: 11.2, startAngle: .pi - 0.15, endAngle: -0.08, clockwise: true)
+        path.addCurve(to: CGPoint(x: w / 2, y: 5), control1: CGPoint(x: 48, y: 20), control2: CGPoint(x: 34, y: 15))
+        path.closeSubpath()
+        ctx.setShadow(offset: CGSize(width: 0, height: -1.5), blur: 3, color: CGColor(gray: 0, alpha: 0.45))
+        ctx.addPath(path)
+        if filled {
+            ctx.setFillColor(CGColor(red: 1, green: 0.33, blue: 0.42, alpha: 1))
+            ctx.fillPath()
+            ctx.setShadow(offset: .zero, blur: 0, color: nil)
+            ctx.setFillColor(CGColor(gray: 1, alpha: 0.55))
+            ctx.fillEllipse(in: CGRect(x: 10, y: 31, width: 8, height: 6))
+        } else {
+            ctx.setStrokeColor(CGColor(gray: 1, alpha: 0.85))
+            ctx.setLineWidth(3)
+            ctx.strokePath()
+        }
+        return SKTexture(cgImage: ctx.makeImage()!)
     }
 }

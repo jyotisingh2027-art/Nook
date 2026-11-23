@@ -4,11 +4,14 @@ import SpriteKit
 /// Hand-drawn (in code) frames for the little winter visitors. Every frame is drawn once
 /// and shared, so a walking reindeer costs about as much as one snowflake.
 enum VisitorArt {
+    /// How much bigger than their drawing the visitors appear on screen.
+    static let displayScale: CGFloat = 1.4
+
 
     // MARK: - Drawing helpers
 
     private static func texture(_ w: CGFloat, _ h: CGFloat, _ draw: (CGContext) -> Void) -> SKTexture {
-        let s: CGFloat = 2
+        let s: CGFloat = 3   // extra detail so they stay sharp when shown larger
         let ctx = CGContext(data: nil, width: Int(w * s), height: Int(h * s), bitsPerComponent: 8, bytesPerRow: 0,
                             space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
         ctx.scaleBy(x: s, y: s)
@@ -345,7 +348,7 @@ extension VisitorArt {
             ctx.fill(CGRect(x: 0, y: baseY - 8, width: W, height: 10))
             for (c, t) in row.enumerated() {
                 let img = t.cgImage()
-                let w = CGFloat(img.width) / 2, h = CGFloat(img.height) / 2
+                let w = CGFloat(img.width) / 3, h = CGFloat(img.height) / 3
                 ctx.draw(img, in: CGRect(x: CGFloat(c) * cell + (cell - w) / 2, y: baseY - 3, width: w, height: h))
             }
         }

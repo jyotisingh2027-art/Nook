@@ -26,6 +26,11 @@ if let i = CommandLine.arguments.firstIndex(of: "--render-imp"), i + 1 < Command
     exit(0)
 }
 
+if let i = CommandLine.arguments.firstIndex(of: "--render-gameover"), i + 1 < CommandLine.arguments.count {
+    GameOverController.renderPreview(to: CommandLine.arguments[i + 1])
+    exit(0)
+}
+
 let app = NSApplication.shared
 let appDelegate = AppDelegate()
 app.delegate = appDelegate

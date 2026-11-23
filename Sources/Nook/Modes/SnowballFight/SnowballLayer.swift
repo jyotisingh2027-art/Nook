@@ -72,7 +72,7 @@ final class SnowballLayer: SKNode {
             "outfit": ["buttons", "mittens", "bowtie"].randomElement()!
         ]
         let art = DecorationRenderer.shared.render(
-            PlacedDecoration(kind: .snowman, x: 0, y: 0, scale: 0.42, options: options, seed: 1))
+            PlacedDecoration(kind: .snowman, x: 0, y: 0, scale: 0.56, options: options, seed: 1))
         let w = art.size.width
 
         guard let perch = perches.filter({ $0.width > w + 30 }).randomElement() else { return }
@@ -189,12 +189,21 @@ final class SnowballLayer: SKNode {
 
     /// True if the pointer is over a snowman or an incoming snowball, so Nook should take the click.
     func hitTest(_ p: CGPoint) -> Bool {
-        incomingBall(at: p) != nil || snowman(at: p) != nil
+        !isFrozen && (incomingBall(at: p) != nil || snowman(at: p) != nil)
+    }
+
+    /// While the game is paused, snowmen and snowballs hold still and can't be clicked.
+    var isFrozen = false {
+        didSet {
+            guard oldValue != isFrozen else { return }
+            isPaused = isFrozen
+            lastTime = 0
+        }
     }
 
     /// Handles a click. `anywhere` is true when Option is held, which throws even at empty space.
     func handleClick(at p: CGPoint, anywhere: Bool) -> Bool {
-        guard isActive else { return false }
+        guard isActive, !isFrozen else { return false }
         if let i = incomingBall(at: p) {
             let b = balls.remove(at: i)
             b.node.removeFromParent()
@@ -229,7 +238,7 @@ final class SnowballLayer: SKNode {
     // MARK: - Every frame
 
     func step(_ now: CFTimeInterval) {
-        guard isActive, !balls.isEmpty else { lastTime = 0; return }
+        guard isActive, !isFrozen, !balls.isEmpty else { lastTime = 0; return }
         let dt = CGFloat(lastTime == 0 ? 1.0 / 30.0 : min(0.1, max(0.001, now - lastTime)))
         lastTime = now
 
