@@ -345,16 +345,27 @@ final class WinterScene: SeasonScene {
             let r = toLocal(w.frame)
             defer { inFront.append(r) }
             let top = r.maxY
-            // Skip windows whose top edge is off this screen or squeezed up against the menu bar,
+            // Skip windows whose top edge is off this screen (or tucked under the menu bar),
             // and windows that are mostly pushed off the side of the screen.
-            guard top > 4, top < visibleTop - 30 else { continue }
+            guard top > 4, top <= visibleTop + 2 else { continue }
             let minX = max(0, r.minX), maxX = min(size.width, r.maxX)
             guard maxX - minX > 40, maxX - minX >= r.width * 0.35 else { continue }
+            // Windows up near the menu bar get a smaller pile that fits the space above them.
+            // Ones that touch it (like a maximised browser) get a thin layer resting on their top edge.
+            let room = visibleTop - top
+            var surfaceY = top
+            var maxHeight = windowSnowMax
+            if room < 14 {
+                surfaceY = visibleTop - 13
+                maxHeight = 7
+            } else if room < windowSnowMax * 1.7 + 4 {
+                maxHeight = max(5, (room - 4) / 1.7)
+            }
             let blocked = inFront
-                .filter { $0.minX < maxX && $0.maxX > minX && $0.minY < top + 8 && $0.maxY > top - 1 }
+                .filter { $0.minX < maxX && $0.maxX > minX && $0.minY < surfaceY + 8 && $0.maxY > surfaceY - 1 }
                 .map { $0.minX...$0.maxX }
-            let s = Surface(key: .window(w.id), minX: minX, maxX: maxX, y: top, blocked: blocked)
-            upsertPile(for: s, maxHeight: windowSnowMax)
+            let s = Surface(key: .window(w.id), minX: minX, maxX: maxX, y: surfaceY, blocked: blocked)
+            upsertPile(for: s, maxHeight: maxHeight)
             newSurfaces.append(s)
             live.insert(s.key)
         }
