@@ -119,7 +119,7 @@ final class WinterVisitors {
 
     private func spawnShovellerIfNeeded(_ piles: [SurfaceKey: SnowPile], visibleTop: CGFloat) {
         let deep = usablePiles(piles, minWidth: 170, headroom: 80, visibleTop: visibleTop)
-            .filter { $0.fullness > (demo ? 0.15 : 0.55) }
+            .filter { $0.fullness > (demo ? 0.15 : 0.8) }
             .max { $0.fullness < $1.fullness }
         guard let pile = deep else { return }
         let outfit = VisitorArt.outfits.randomElement()!
@@ -258,7 +258,7 @@ final class WinterVisitors {
         v.workT += dt
         switch v.work {
         case .walking:
-            let snowAhead = snowDepth(pile, fromU: v.u + v.dir * 8, length: 24, dir: v.dir)
+            let snowAhead = snowDepth(pile, fromU: v.u + v.dir * 8, length: 24, dir: v.dir) - pile.maxHeight * 0.4
             // Stroll faster over bare patches.
             v.u += v.dir * (snowAhead > 1.4 ? 38 : 60) * dt
             v.setTexture(VisitorArt.shoveller(Int(v.workT / 0.14) % 2 == 0 ? .walkA : .walkB, outfit: outfit))
@@ -273,7 +273,7 @@ final class WinterVisitors {
                 let start = v.u + v.dir * 6
                 let a = min(start, start + v.dir * 28), b = max(start, start + v.dir * 28)
                 let lo = max(0, Int(a / SnowPile.columnWidth)), hi = min(pile.heights.count, Int(b / SnowPile.columnWidth) + 1)
-                let amount = lo < hi ? pile.scoop(columns: lo..<hi, keep: 0.8) : 0
+                let amount = lo < hi ? pile.scoop(columns: lo..<hi, keep: pile.maxHeight * 0.4) : 0
                 v.work = .tossing
                 v.workT = 0
                 if amount > 0.5 {

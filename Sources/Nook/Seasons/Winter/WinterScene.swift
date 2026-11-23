@@ -46,7 +46,7 @@ final class WinterScene: SeasonScene {
     // MARK: - Tuning
 
     private let windowSnowMax: CGFloat = 20
-    private let dockSnowMax: CGFloat = 22
+    private let dockSnowMax: CGFloat = 30
     private let groundSnowMax: CGFloat = 20
     private let gravity: CGFloat = 650
     private let maxChunks = 450
@@ -180,7 +180,8 @@ final class WinterScene: SeasonScene {
             f.pos.x += (cos(f.phase) * f.swayAmount + wind * f.depth) * dt
 
             if f.canLand, let pile = landingPile(x: f.pos.x, fromY: prevY, toY: f.pos.y, ignoring: nil) {
-                pile.add(atLocalX: f.pos.x, amount: f.size * landAmount)
+                // The Dock is the cosiest ledge: snow builds up there twice as fast.
+                pile.add(atLocalX: f.pos.x, amount: f.size * landAmount * (pile.key == .dock ? 2 : 1))
                 respawn(&f)
             } else if f.pos.y < -12 || f.pos.x < -50 || f.pos.x > w + 50 {
                 respawn(&f)
@@ -392,7 +393,7 @@ final class WinterScene: SeasonScene {
         // When Nook starts, give everything a light dusting so the effect is visible right away.
         if !hasDusted && !piles.isEmpty {
             hasDusted = true
-            piles.values.forEach { $0.dust(5) }
+            piles.values.forEach { $0.dust($0.key == .dock ? 9 : 5) }
         }
     }
 
