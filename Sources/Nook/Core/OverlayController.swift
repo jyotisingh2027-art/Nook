@@ -24,12 +24,14 @@ final class OverlayController: WindowTrackerObserver {
     private var dockRefreshCounter = 0
     private var mouseMonitors: [Any] = []
 
-    private enum Hover { case none, decoration, gift }
+    private enum Hover { case none, decoration, gift, snowball, aiming }
     private var hover = Hover.none
 
-    // Catch the Gift
-    private var giftTimer: Timer?
-    private var nextGiftAt: CFTimeInterval = 0
+    // Playful modes (Catch the Gift, Snowball Fight)
+    private var modeTimer: Timer?
+    private var timerMode: AppMode?
+    private var nextSpawnAt: CFTimeInterval = 0
+    private var wasAiming = false
 
     init(season: Season) {
         self.season = season
@@ -85,6 +87,7 @@ final class OverlayController: WindowTrackerObserver {
             view.presentScene(scene)
             scene.decorationLayer.sync()
             scene.giftLayer.isActive = giftsOn
+            scene.snowballLayer.isActive = snowballsOn
 
             NotificationCenter.default.addObserver(self, selector: #selector(occlusionChanged(_:)),
                                                    name: NSWindow.didChangeOcclusionStateNotification, object: window)
@@ -161,44 +164,64 @@ final class OverlayController: WindowTrackerObserver {
             o.scene.snowSpeed = amount.speed
             o.scene.snowBuildUp = amount.buildUp
             o.scene.giftLayer.isActive = giftsOn
+            o.scene.snowballLayer.isActive = snowballsOn
         }
-        updateGiftTimer()
+        updateModeTimer()
         updateRunState()
     }
 
-    // MARK: - Catch the Gift
+    // MARK: - Playful modes
 
-    /// Gifts fall only in Catch the Gift mode, and never while the snow is paused.
+    /// The playful modes run only while chosen, and never while the snow is paused.
     private var giftsOn: Bool { Settings.shared.mode == .catchGift && !Settings.shared.isPaused }
+    private var snowballsOn: Bool { Settings.shared.mode == .snowballFight && !Settings.shared.isPaused }
 
-    private func updateGiftTimer() {
-        if giftsOn {
-            guard giftTimer == nil else { return }
-            nextGiftAt = CACurrentMediaTime() + 2.5   // the first gift comes quickly
-            let t = Timer(timeInterval: 0.1, repeats: true) { [weak self] _ in self?.giftTick() }
-            RunLoop.main.add(t, forMode: .common)
-            giftTimer = t
-        } else {
-            giftTimer?.invalidate()
-            giftTimer = nil
-            updateMouseCapture()
+    private func updateModeTimer() {
+        let mode: AppMode? = giftsOn ? .catchGift : (snowballsOn ? .snowballFight : nil)
+        guard mode != timerMode else { return }
+        timerMode = mode
+        modeTimer?.invalidate()
+        modeTimer = nil
+        guard let mode else { updateMouseCapture(); return }
+
+        nextSpawnAt = CACurrentMediaTime() + (mode == .catchGift ? 2.5 : 3.5)   // the first one comes quickly
+        let t = Timer(timeInterval: 0.1, repeats: true) { [weak self] _ in self?.modeTick() }
+        RunLoop.main.add(t, forMode: .common)
+        modeTimer = t
+
+        if mode == .snowballFight {
+            // Remind people how to throw, on the screen with the menu bar.
+            let main = overlays.first { $0.screen == NSScreen.screens.first } ?? overlays.first
+            main?.scene.snowballLayer.showHint()
         }
     }
 
-    private func giftTick() {
+    private func modeTick() {
         let now = CACurrentMediaTime()
-        if now >= nextGiftAt {
-            // Drop on one screen that's awake and showing, chosen at random.
+        if now >= nextSpawnAt {
+            // Something new appears on one screen that's awake and showing, chosen at random.
             let ready = overlays.filter { !$0.view.isPaused && $0.window.isVisible }
-            ready.randomElement()?.scene.dropGift()
-            let wait = Double.random(in: 6...14) * (PowerMonitor.shared.shouldSaveEnergy ? 1.5 : 1)
-            nextGiftAt = now + wait
+            let wait: Double
+            if timerMode == .snowballFight {
+                ready.randomElement()?.scene.snowballLayer.spawnSnowman()
+                wait = Double.random(in: 4...9)
+            } else {
+                ready.randomElement()?.scene.dropGift()
+                wait = Double.random(in: 6...14)
+            }
+            nextSpawnAt = now + wait * (PowerMonitor.shared.shouldSaveEnergy ? 1.5 : 1)
         }
-        // Gifts move under a still pointer, so keep checking whether one is there to click.
-        if hover == .gift || overlays.contains(where: { $0.scene.giftLayer.hasGifts }) {
+        // Targets move under a still pointer, and Option can be pressed without moving the mouse,
+        // so keep checking whether Nook should take the next click.
+        let aiming = isAiming
+        let busy = overlays.contains { $0.scene.giftLayer.hasGifts || $0.scene.snowballLayer.hasTargets }
+        if busy || aiming != wasAiming || hover == .gift || hover == .snowball {
             updateMouseCapture()
         }
     }
+
+    /// Holding Option in Snowball Fight turns the pointer into a crosshair that throws anywhere.
+    private var isAiming: Bool { snowballsOn && NSEvent.modifierFlags.contains(.option) }
 
     private func applyEnergySettings() {
         let save = PowerMonitor.shared.shouldSaveEnergy
@@ -240,20 +263,24 @@ final class OverlayController: WindowTrackerObserver {
     private func updateMouseCapture() {
         guard !DecorationInteraction.shared.isDragging else { return }
         let p = NSEvent.mouseLocation
-        let overGift = giftsOn && overlays.contains {
-            $0.screen.frame.contains(p) && $0.window.isVisible && $0.scene.giftHit(atGlobal: p)
-        }
-        let overDecoration = !overGift && hasVisibleDecorations && DecorationStore.shared.hitTest(p) != nil
-        let over = overGift || overDecoration
+        let aiming = isAiming
+        wasAiming = aiming
+        let pointerScene = overlays.first { $0.screen.frame.contains(p) && $0.window.isVisible }?.scene
+        let overGift = giftsOn && pointerScene?.giftHit(atGlobal: p) == true
+        let overSnowball = snowballsOn && pointerScene?.snowballTargetHit(atGlobal: p) == true
+        let overDecoration = !overGift && !overSnowball && !aiming
+            && hasVisibleDecorations && DecorationStore.shared.hitTest(p) != nil
+        let over = overGift || overSnowball || aiming || overDecoration
         for o in overlays {
             let capture = over && o.screen.frame.contains(p) && o.window.isVisible
             if o.window.ignoresMouseEvents == capture { o.window.ignoresMouseEvents = !capture }
         }
-        let now: Hover = overGift ? .gift : (overDecoration ? .decoration : .none)
+        let now: Hover = overGift ? .gift : overSnowball ? .snowball : aiming ? .aiming : overDecoration ? .decoration : .none
         if now != hover {
             hover = now
             switch now {
             case .gift: NSCursor.pointingHand.set()
+            case .snowball, .aiming: NSCursor.crosshair.set()
             case .decoration: NSCursor.openHand.set()
             case .none: NSCursor.arrow.set()
             }
@@ -315,8 +342,40 @@ final class OverlayController: WindowTrackerObserver {
         for o in overlays {
             o.scene.ownWindowFrames = own
             o.scene.giftLayer.dockRect = dockRect.map { o.scene.toLocal($0) }
+            if snowballsOn { o.scene.snowballLayer.perches = perches(for: o, windows: windows) }
             o.scene.windowsDidUpdate(windows, events: events, dockRect: dockRect)
         }
+    }
+
+    // MARK: - Snowball Fight ledges
+
+    /// Ledges on one screen where a snowman can stand: the tops of the front few windows,
+    /// the Dock, and the bottom of the screen when the Dock isn't there.
+    private func perches(for o: Overlay, windows: [TrackedWindow]) -> [CGRect] {
+        let scene = o.scene
+        let bounds = CGRect(origin: .zero, size: scene.size)
+        var result: [CGRect] = []
+        var dockAtBottom = false
+        if let d = dockRect.map({ scene.toLocal($0) }), d.intersects(bounds) {
+            result.append(CGRect(x: max(0, d.minX), y: d.maxY, width: min(bounds.maxX, d.maxX) - max(0, d.minX), height: 0))
+            dockAtBottom = d.minY < 5 && d.width > d.height
+        }
+        if !dockAtBottom { result.append(CGRect(x: 0, y: 0, width: bounds.width, height: 0)) }
+
+        var inFront: [CGRect] = []
+        for w in windows.prefix(6) {
+            let r = scene.toLocal(w.frame)
+            defer { inFront.append(r) }
+            // Skip windows tucked under the menu bar, too low to stand on, or mostly off screen.
+            guard r.maxY > 60, r.maxY < scene.visibleTop - 120, r.width > 160 else { continue }
+            let minX = max(0, r.minX), maxX = min(bounds.maxX, r.maxX)
+            guard maxX - minX > 160 else { continue }
+            // Skip a ledge whose middle is hidden behind a window in front of it.
+            let mid = CGPoint(x: (minX + maxX) / 2, y: r.maxY + 4)
+            if inFront.contains(where: { $0.contains(mid) }) { continue }
+            result.append(CGRect(x: minX, y: r.maxY, width: maxX - minX, height: 0))
+        }
+        return result
     }
 }
 

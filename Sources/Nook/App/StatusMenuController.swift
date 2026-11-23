@@ -73,7 +73,7 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         menu.removeAllItems()
         let settings = Settings.shared
 
-        let header = NSMenuItem(title: settings.mode == .catchGift ? "Nook · Winter · Catch the Gift" : "Nook · Winter",
+        let header = NSMenuItem(title: settings.mode == .cozy ? "Nook · Winter" : "Nook · Winter · \(settings.mode.title)",
                                 action: nil, keyEquivalent: "")
         header.isEnabled = false
         menu.addItem(header)
@@ -104,12 +104,19 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
                 lines.append("Every surprise unlocked!")
             }
             if settings.isPaused { lines.append("Resume the snow to keep playing") }
-            for line in lines {
-                let info = NSMenuItem(title: line, action: nil, keyEquivalent: "")
-                info.isEnabled = false
-                info.indentationLevel = 1
-                menu.addItem(info)
-            }
+            addInfo(lines, to: menu)
+        }
+
+        // Snowball Fight score and controls
+        if settings.mode == .snowballFight {
+            let stats = SnowballStats.shared
+            var lines = [
+                "Snowmen bonked: \(stats.bonked)   ·   Blocked: \(stats.blocked)   ·   Splats taken: \(stats.splatted)",
+                "Click a snowman to throw. Hold ⌥ Option and click to throw anywhere.",
+                "Click an incoming snowball to swat it away."
+            ]
+            if settings.isPaused { lines.append("Resume the snow to keep playing") }
+            addInfo(lines, to: menu)
         }
 
         // Wallpaper
@@ -193,6 +200,16 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         let quit = NSMenuItem(title: "Quit Nook", action: #selector(quit), keyEquivalent: "q")
         quit.target = self
         menu.addItem(quit)
+    }
+
+    /// Grey, non-clickable lines that show a mode's score and controls.
+    private func addInfo(_ lines: [String], to menu: NSMenu) {
+        for line in lines {
+            let info = NSMenuItem(title: line, action: nil, keyEquivalent: "")
+            info.isEnabled = false
+            info.indentationLevel = 1
+            menu.addItem(info)
+        }
     }
 
     @objc private func pickMode(_ sender: NSMenuItem) {

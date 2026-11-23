@@ -20,8 +20,9 @@ class SeasonScene: SKScene {
     /// Decorations are shared by every season, so the base scene owns them.
     let decorationLayer: DecorationLayer
 
-    /// Falling gifts for Catch the Gift. Every season gets the game for free.
+    /// The playful modes live on every season's scene, so every season gets them for free.
     let giftLayer = GiftLayer()
+    let snowballLayer = SnowballLayer()
 
     /// False when the user pauses the weather; decorations still show.
     var weatherVisible = true { didSet { if oldValue != weatherVisible { weatherVisibilityChanged() } } }
@@ -41,20 +42,27 @@ class SeasonScene: SKScene {
         super.init(size: screenFrame.size)
         addChild(decorationLayer)
         addChild(giftLayer)
+        snowballLayer.screenOrigin = screenFrame.origin
+        addChild(snowballLayer)
     }
 
     /// Runs after the season's own update each frame.
     override func didFinishUpdate() {
-        giftLayer.step(CACurrentMediaTime())
+        let now = CACurrentMediaTime()
+        giftLayer.step(now)
+        snowballLayer.step(now)
     }
 
-    // MARK: - Catch the Gift (global coordinates)
+    // MARK: - Playful modes (global coordinates)
+
+    private func local(_ p: CGPoint) -> CGPoint { CGPoint(x: p.x - screenFrame.minX, y: p.y - screenFrame.minY) }
 
     func dropGift() { giftLayer.drop(in: size) }
 
-    func giftHit(atGlobal p: CGPoint) -> Bool {
-        giftLayer.hitTest(CGPoint(x: p.x - screenFrame.minX, y: p.y - screenFrame.minY))
-    }
+    func giftHit(atGlobal p: CGPoint) -> Bool { giftLayer.hitTest(local(p)) }
+
+    /// A snowman or an incoming snowball is under the pointer.
+    func snowballTargetHit(atGlobal p: CGPoint) -> Bool { snowballLayer.hitTest(local(p)) }
 
     func weatherVisibilityChanged() {}
 
@@ -67,7 +75,9 @@ class SeasonScene: SKScene {
 
     override func mouseDown(with event: NSEvent) {
         let p = globalPoint(event)
-        if giftLayer.catchGift(at: CGPoint(x: p.x - screenFrame.minX, y: p.y - screenFrame.minY)) { return }
+        if giftLayer.catchGift(at: local(p)) { return }
+        // Holding Option throws a snowball wherever you click.
+        if snowballLayer.handleClick(at: local(p), anywhere: event.modifierFlags.contains(.option)) { return }
         DecorationInteraction.shared.mouseDown(at: p, event: event)
     }
     override func mouseDragged(with event: NSEvent) { DecorationInteraction.shared.mouseDragged(to: globalPoint(event)) }
