@@ -200,7 +200,7 @@ final class OverlayController: WindowTrackerObserver {
         modeTimer = nil
         guard let mode else { updateMouseCapture(); return }
 
-        nextSpawnAt = CACurrentMediaTime() + (mode == .catchGift ? 2.5 : 3.5)   // the first one comes quickly
+        nextSpawnAt = CACurrentMediaTime() + (mode == .catchGift ? 2.5 : 0.8)   // the first one comes quickly
         let t = Timer(timeInterval: 0.1, repeats: true) { [weak self] _ in self?.modeTick() }
         RunLoop.main.add(t, forMode: .common)
         modeTimer = t
@@ -225,7 +225,7 @@ final class OverlayController: WindowTrackerObserver {
             let wait: Double
             if timerMode == .snowballFight {
                 ready.randomElement()?.scene.snowballLayer.spawnSnowman()
-                wait = Double.random(in: 4...9)
+                wait = Double.random(in: 1.2...3.0)
             } else {
                 ready.randomElement()?.scene.dropGift()
                 // Gifts come more often as your score climbs.

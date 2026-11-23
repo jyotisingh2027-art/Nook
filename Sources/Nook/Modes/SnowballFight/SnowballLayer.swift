@@ -10,7 +10,10 @@ final class SnowballLayer: SKNode {
     private final class Snowman {
         let node: SKSpriteNode
         let perch: CGRect          // the ledge it stands on (zero height)
-        init(node: SKSpriteNode, perch: CGRect) { self.node = node; self.perch = perch }
+        let onDrift: Bool          // popped out of its own little snowdrift, so no ledge to lose
+        init(node: SKSpriteNode, perch: CGRect, onDrift: Bool = false) {
+            self.node = node; self.perch = perch; self.onDrift = onDrift
+        }
     }
 
     /// A snowball in flight. Incoming ones grow as they come at you; yours shrink as they fly off.
@@ -62,7 +65,7 @@ final class SnowballLayer: SKNode {
     // MARK: - Snowmen
 
     func spawnSnowman() {
-        guard isActive, snowmen.count < 2 else { return }
+        guard isActive, snowmen.count < 4 else { return }
         let options = [
             "body": ["classic", "chubby"].randomElement()!,
             "hat": ["topHat", "beanie", "santa"].randomElement()!,
@@ -75,12 +78,28 @@ final class SnowballLayer: SKNode {
             PlacedDecoration(kind: .snowman, x: 0, y: 0, scale: 0.56, options: options, seed: 1))
         let w = art.size.width
 
-        guard let perch = perches.filter({ $0.width > w + 30 }).randomElement() else { return }
+        // Usually they pop out of a snowdrift anywhere on screen; sometimes they stand on a window or the Dock.
+        let ledges = perches.filter { $0.width > w + 30 }
+        var perch = CGRect.zero
         var spot: CGFloat?
-        for _ in 0..<6 {
-            let x = CGFloat.random(in: (perch.minX + w / 2 + 10)...(perch.maxX - w / 2 - 10))
-            let clear = snowmen.allSatisfy { abs($0.node.position.x - x) > w * 1.3 || abs($0.perch.minY - perch.minY) > 5 }
-            if clear { spot = x; break }
+        var onDrift = false
+        if ledges.isEmpty || Double.random(in: 0...1) < 0.65 {
+            let size = screenSize
+            let top = (scene as? SeasonScene)?.visibleTop ?? size.height - 30
+            let maxY = top - art.size.height - 50
+            guard maxY > 100, size.width > w + 100 else { return }
+            for _ in 0..<10 {
+                let p = CGPoint(x: CGFloat.random(in: (w / 2 + 40)...(size.width - w / 2 - 40)), y: CGFloat.random(in: 90...maxY))
+                let clear = snowmen.allSatisfy { hypot($0.node.position.x - p.x, $0.node.position.y - p.y) > w * 1.8 }
+                if clear { spot = p.x; perch = CGRect(x: p.x - w, y: p.y, width: w * 2, height: 0); onDrift = true; break }
+            }
+        } else if let ledge = ledges.randomElement() {
+            perch = ledge
+            for _ in 0..<6 {
+                let x = CGFloat.random(in: (perch.minX + w / 2 + 10)...(perch.maxX - w / 2 - 10))
+                let clear = snowmen.allSatisfy { abs($0.node.position.x - x) > w * 1.3 || abs($0.perch.minY - perch.minY) > 5 }
+                if clear { spot = x; break }
+            }
         }
         guard let x = spot else { return }
 
@@ -90,7 +109,21 @@ final class SnowballLayer: SKNode {
         node.position = CGPoint(x: x, y: perch.minY - 2)
         node.yScale = 0.01
         addChild(node)
-        let snowman = Snowman(node: node, perch: perch)
+        if onDrift {
+            // A little mound of snow for it to burst out of.
+            let drift = SKSpriteNode(texture: SnowTextures.shared.mound)
+            drift.anchorPoint = CGPoint(x: 0.5, y: 0)
+            drift.size = CGSize(width: w * 1.6, height: 22)
+            drift.position = CGPoint(x: x, y: perch.minY - 6)
+            drift.zPosition = 0.5
+            drift.alpha = 0
+            addChild(drift)
+            drift.run(.sequence([.fadeIn(withDuration: 0.15), .wait(forDuration: 4.6),
+                                 .fadeOut(withDuration: 0.6), .removeFromParent()]))
+            ModeEffects.burst(in: self, at: CGPoint(x: x, y: perch.minY + 8), count: 12, colours: ModeEffects.snowColours,
+                              sizes: 3...7, distance: 15...45)
+        }
+        let snowman = Snowman(node: node, perch: perch, onDrift: onDrift)
         snowmen.append(snowman)
 
         let rise = SKAction.scaleY(to: 1, duration: 0.3)
@@ -138,7 +171,7 @@ final class SnowballLayer: SKNode {
     }
 
     private func checkPerches() {
-        for s in snowmen {
+        for s in snowmen where !s.onDrift {
             let x = s.node.position.x
             let still = perches.contains { abs($0.minY - s.perch.minY) < 3 && $0.minX <= x && $0.maxX >= x }
             if !still { tumble(s) }
