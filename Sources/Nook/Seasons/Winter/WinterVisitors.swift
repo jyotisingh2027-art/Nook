@@ -39,7 +39,7 @@ final class WinterVisitors {
                 if !visitors.contains(where: { $0.isAnimal }) { spawnAnimal(piles, visibleTop: visibleTop) }
             }
             if clock >= nextShovelCheckAt {
-                nextShovelCheckAt = clock + 4
+                nextShovelCheckAt = clock + 2
                 if clock >= shovellerRestUntil, !visitors.contains(where: { $0.isShoveller }) {
                     spawnShovellerIfNeeded(piles, visibleTop: visibleTop)
                 }
@@ -53,7 +53,7 @@ final class WinterVisitors {
             if update(v, dt: dt, piles: piles) {
                 i += 1
             } else {
-                if v.isShoveller { shovellerRestUntil = clock + (demo ? 3 : Double.random(in: 45...100)) }
+                if v.isShoveller { shovellerRestUntil = clock + (demo ? 3 : Double.random(in: 6...15)) }
                 v.node.removeFromParent()
                 visitors.remove(at: i)
             }
@@ -119,7 +119,7 @@ final class WinterVisitors {
 
     private func spawnShovellerIfNeeded(_ piles: [SurfaceKey: SnowPile], visibleTop: CGFloat) {
         let deep = usablePiles(piles, minWidth: 170, headroom: 80, visibleTop: visibleTop)
-            .filter { $0.fullness > (demo ? 0.15 : 0.8) }
+            .filter { $0.fullness > (demo ? 0.15 : 0.35) }
             .max { $0.fullness < $1.fullness }
         guard let pile = deep else { return }
         let outfit = VisitorArt.outfits.randomElement()!
@@ -258,7 +258,7 @@ final class WinterVisitors {
         v.workT += dt
         switch v.work {
         case .walking:
-            let snowAhead = snowDepth(pile, fromU: v.u + v.dir * 8, length: 24, dir: v.dir) - pile.maxHeight * 0.4
+            let snowAhead = snowDepth(pile, fromU: v.u + v.dir * 8, length: 24, dir: v.dir) - pile.maxHeight * 0.15
             // Stroll faster over bare patches.
             v.u += v.dir * (snowAhead > 1.4 ? 38 : 60) * dt
             v.setTexture(VisitorArt.shoveller(Int(v.workT / 0.14) % 2 == 0 ? .walkA : .walkB, outfit: outfit))
@@ -273,7 +273,7 @@ final class WinterVisitors {
                 let start = v.u + v.dir * 6
                 let a = min(start, start + v.dir * 28), b = max(start, start + v.dir * 28)
                 let lo = max(0, Int(a / SnowPile.columnWidth)), hi = min(pile.heights.count, Int(b / SnowPile.columnWidth) + 1)
-                let amount = lo < hi ? pile.scoop(columns: lo..<hi, keep: pile.maxHeight * 0.4) : 0
+                let amount = lo < hi ? pile.scoop(columns: lo..<hi, keep: pile.maxHeight * 0.15) : 0
                 v.work = .tossing
                 v.workT = 0
                 if amount > 0.5 {

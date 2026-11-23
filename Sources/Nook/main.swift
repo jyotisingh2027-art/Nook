@@ -31,6 +31,11 @@ if let i = CommandLine.arguments.firstIndex(of: "--render-gameover"), i + 1 < Co
     exit(0)
 }
 
+if let i = CommandLine.arguments.firstIndex(of: "--render-move"), i + 1 < CommandLine.arguments.count {
+    WinterPreview.renderMove(to: CommandLine.arguments[i + 1])
+    exit(0)
+}
+
 let app = NSApplication.shared
 let appDelegate = AppDelegate()
 app.delegate = appDelegate

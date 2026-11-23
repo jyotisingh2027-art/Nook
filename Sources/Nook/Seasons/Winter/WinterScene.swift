@@ -27,6 +27,9 @@ final class WinterScene: SeasonScene {
         let ignore: SurfaceKey?
         var ignoreTime: CGFloat
         let spin: CGFloat
+        /// Snow knocked off a window stays visible as it tumbles, even over windows,
+        /// so you can see it fall away.
+        var visibleFor: CGFloat
     }
 
     private struct Surface {
@@ -220,7 +223,8 @@ final class WinterScene: SeasonScene {
 
     // MARK: - Clumps of snow in flight
 
-    private func spawnChunk(at p: CGPoint, velocity: CGVector, size: CGFloat, ignore: SurfaceKey?, ignoreTime: CGFloat) {
+    private func spawnChunk(at p: CGPoint, velocity: CGVector, size: CGFloat, ignore: SurfaceKey?, ignoreTime: CGFloat,
+                            alwaysVisibleFor: CGFloat = 0) {
         guard chunks.count < maxChunks else { return }
         let node = SKSpriteNode(texture: textures.clump)
         node.size = CGSize(width: size, height: size)
@@ -229,7 +233,7 @@ final class WinterScene: SeasonScene {
         node.zRotation = CGFloat.random(in: 0...(2 * .pi))
         chunkLayer.addChild(node)
         chunks.append(Chunk(node: node, pos: p, vel: velocity, size: size, ignore: ignore,
-                            ignoreTime: ignoreTime, spin: CGFloat.random(in: -4...4)))
+                            ignoreTime: ignoreTime, spin: CGFloat.random(in: -4...4), visibleFor: alwaysVisibleFor))
     }
 
     private func updateChunks(_ dt: CGFloat) {
@@ -244,6 +248,7 @@ final class WinterScene: SeasonScene {
             c.pos.x += c.vel.dx * dt
             c.pos.y += c.vel.dy * dt
             c.ignoreTime -= dt
+            c.visibleFor -= dt
 
             var remove = false
             if c.vel.dy < 0,
@@ -261,7 +266,7 @@ final class WinterScene: SeasonScene {
                 continue
             }
             c.node.position = c.pos
-            let hideChunk = insideWindow(c.pos)
+            let hideChunk = c.visibleFor <= 0 && insideWindow(c.pos)
             if c.node.isHidden != hideChunk { c.node.isHidden = hideChunk }
             c.node.zRotation += c.spin * dt
             chunks[i] = c
@@ -297,7 +302,7 @@ final class WinterScene: SeasonScene {
                 case .tumble:
                     v = CGVector(dx: CGFloat.random(in: -50...50), dy: CGFloat.random(in: 20...110))
                 }
-                spawnChunk(at: p, velocity: v, size: size, ignore: pile.key, ignoreTime: ignoreTime)
+                spawnChunk(at: p, velocity: v, size: size, ignore: pile.key, ignoreTime: ignoreTime, alwaysVisibleFor: 1.2)
             }
             start += group
         }
