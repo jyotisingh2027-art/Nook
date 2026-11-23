@@ -39,7 +39,7 @@ final class GiftLayer: SKNode {
         init(pos: CGPoint, targetID: Int, homeX: CGFloat) {
             self.pos = pos; self.targetID = targetID; self.homeX = homeX
         }
-        var bodyCentre: CGPoint { CGPoint(x: pos.x, y: pos.y + 8) }
+        var bodyCentre: CGPoint { CGPoint(x: pos.x, y: pos.y + 4) }
     }
 
     private var imp: Imp?
@@ -177,7 +177,7 @@ final class GiftLayer: SKNode {
                     let fromLeft = g.pos.x < w / 2
                     let homeX: CGFloat = fromLeft ? -50 : w + 50
                     let i = Imp(pos: CGPoint(x: homeX, y: max(90, g.pos.y - 150)), targetID: g.id, homeX: homeX)
-                    i.node.size = CGSize(width: FrostImpArt.size.width * 1.4, height: FrostImpArt.size.height * 1.4)
+                    i.node.size = CGSize(width: FrostImpArt.size.width * 1.3, height: FrostImpArt.size.height * 1.3)
                     i.node.zPosition = 1
                     i.node.position = i.pos
                     addChild(i.node)
@@ -195,7 +195,7 @@ final class GiftLayer: SKNode {
                 imp.state = .leaving
                 return
             }
-            let target = CGPoint(x: g.pos.x, y: g.pos.y - 46)
+            let target = CGPoint(x: g.pos.x, y: g.pos.y - 58)
             let dx = target.x - imp.pos.x, dy = target.y - imp.pos.y
             let d = max(0.001, hypot(dx, dy))
             let speed: CGFloat = (100 + CGFloat(min(GiftStats.shared.streak, 10)) * 4) * (energySaving ? 0.9 : 1)
@@ -209,7 +209,7 @@ final class GiftLayer: SKNode {
             imp.pos.y += 40 * dt
             imp.node.texture = FrostImpArt.texture(.grab)
             if var c = imp.carried {
-                c.pos = CGPoint(x: imp.pos.x, y: imp.pos.y + 52 + bob)
+                c.pos = CGPoint(x: imp.pos.x, y: imp.pos.y + 62 + bob)
                 c.node.position = c.pos
                 imp.carried = c
             }
@@ -243,7 +243,7 @@ final class GiftLayer: SKNode {
         imp.node.xScale = imp.homeX < 0 ? -1 : 1
         GiftStats.shared.recordStolen()
         lifeLostText(at: CGPoint(x: imp.pos.x, y: imp.pos.y + 100))
-        floatText("Hehehe! Stolen!", at: CGPoint(x: imp.pos.x, y: imp.pos.y + 70), size: 20)
+        floatText("ROAR! Stolen!", at: CGPoint(x: imp.pos.x, y: imp.pos.y + 70), size: 20)
     }
 
     /// Clicking the imp scares it off. If it was carrying a gift, the gift drops back down.
@@ -257,15 +257,15 @@ final class GiftLayer: SKNode {
             imp.carried = nil
             c.pos = CGPoint(x: c.pos.x, y: c.pos.y)
             gifts.append(c)
-            floatText("Shoo! Gift rescued!", at: CGPoint(x: imp.pos.x, y: imp.pos.y + 60), size: 20)
+            floatText("Shoo, yeti! Gift rescued!", at: CGPoint(x: imp.pos.x, y: imp.pos.y + 60), size: 20)
         } else {
-            floatText("Shoo!", at: CGPoint(x: imp.pos.x, y: imp.pos.y + 50), size: 20)
+            floatText("Shoo, yeti!", at: CGPoint(x: imp.pos.x, y: imp.pos.y + 50), size: 20)
         }
     }
 
     private func impHit(_ p: CGPoint) -> Imp? {
         guard let imp, imp.state != .shooed else { return nil }
-        return hypot(p.x - imp.bodyCentre.x, p.y - imp.bodyCentre.y) < 44 ? imp : nil
+        return hypot(p.x - imp.bodyCentre.x, p.y - imp.bodyCentre.y) < 50 ? imp : nil
     }
 
     private func floorY(at x: CGFloat) -> CGFloat {

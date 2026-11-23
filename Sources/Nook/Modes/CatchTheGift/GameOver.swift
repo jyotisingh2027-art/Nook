@@ -92,7 +92,7 @@ struct GameOverView: View {
                 tile("trophy.fill", "\(result.bestGame)", "Best game")
                 tile("flame.fill", "\(result.bestStreak)", "Longest streak")
                 tile("clock.fill", time, "Time played")
-                tile("hand.raised.fill", "\(result.impsChased)", "Imps chased off")
+                tile("hand.raised.fill", "\(result.impsChased)", "Yetis chased off")
                 tile("gift.fill", "\(result.stolen)", "Gifts stolen")
                 tile("arrow.down.to.line", "\(result.missed)", "Gifts missed")
             }

@@ -124,7 +124,7 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
                 lines.append("Every surprise unlocked!")
             }
             if stats.impsShooed + stats.giftsStolen > 0 {
-                lines.append("Frost imp: chased off \(stats.impsShooed)   ·   gifts stolen \(stats.giftsStolen)")
+                lines.append("Yeti: chased off \(stats.impsShooed)   ·   gifts stolen \(stats.giftsStolen)")
             }
             if settings.isPaused { lines.append("Resume the snow to keep playing") }
             addInfo(lines, to: menu)

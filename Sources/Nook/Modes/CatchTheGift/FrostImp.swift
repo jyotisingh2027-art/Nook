@@ -1,11 +1,11 @@
 import AppKit
 import SpriteKit
 
-/// Nook's villain: a cheeky little frost imp riding a puff of cloud. In Catch the Gift it
-/// sneaks in from the side and tries to snatch a falling gift before you catch it.
-/// Click it to chase it off.
+/// Nook's villain: a big white yeti, built like a gorilla, carried on a swirling gust of snow.
+/// In Catch the Gift it swoops in from the side to snatch a falling gift before you catch it.
+/// Click it to chase it off. (The code still calls it the "imp".)
 enum FrostImpArt {
-    static let size = CGSize(width: 54, height: 60)
+    static let size = CGSize(width: 64, height: 77)
 
     enum Pose { case flyA, flyB, grab, shooed }
 
@@ -43,103 +43,106 @@ enum FrostImpArt {
     }
 
     private static func draw(_ ctx: CGContext, _ pose: Pose) {
-        let skin = rgb(0x7d97c2), skinDark = rgb(0x5c739e), belly = rgb(0xb8cbe8)
-        let ice = rgb(0xdff6ff), cloud = rgb(0xf4f9ff), cloudShade = rgb(0xc9dcf2)
-        let ink = rgb(0x1d2238)
-        let cx: CGFloat = 27
+        let fur = rgb(0xf5f7fc), furShade = rgb(0xd3dbea), furLine = rgb(0xaab7cf)
+        let skin = rgb(0x8a9fc2), skinLight = rgb(0xaebfdc), ink = rgb(0x1b2033)
+        let cx: CGFloat = 32
 
-        // Its little cloud. The puffs shift between frames so it looks like it's drifting.
-        let puff: CGFloat = pose == .flyB ? 1.5 : 0
-        oval(ctx, CGPoint(x: cx, y: 8), 40, 10, cloudShade)
-        oval(ctx, CGPoint(x: cx - 12 + puff, y: 11), 16, 12, cloud)
-        oval(ctx, CGPoint(x: cx + 1 - puff, y: 13), 20, 14, cloud)
-        oval(ctx, CGPoint(x: cx + 13 + puff, y: 10.5), 14, 11, cloud)
-
-        // Feet dangling into the cloud, and a curly tail tipped with an icicle.
-        oval(ctx, CGPoint(x: cx - 5, y: 16), 6, 4, skinDark)
-        oval(ctx, CGPoint(x: cx + 5, y: 16), 6, 4, skinDark)
-        ctx.setStrokeColor(skinDark); ctx.setLineWidth(2)
-        ctx.move(to: CGPoint(x: cx + 8, y: 20))
-        ctx.addCurve(to: CGPoint(x: cx + 19, y: 26), control1: CGPoint(x: cx + 16, y: 16), control2: CGPoint(x: cx + 20, y: 20))
+        // The swirling gust of snow that carries it.
+        let swirl: CGFloat = pose == .flyB ? 2 : 0
+        oval(ctx, CGPoint(x: cx, y: 5), 50, 9, rgb(0xdbe9fb, 0.55))
+        oval(ctx, CGPoint(x: cx - 14 + swirl, y: 7), 18, 9, rgb(0xffffff, 0.8))
+        oval(ctx, CGPoint(x: cx + 2 - swirl, y: 8.5), 22, 10, rgb(0xffffff, 0.85))
+        oval(ctx, CGPoint(x: cx + 16 + swirl, y: 6.5), 16, 8, rgb(0xffffff, 0.75))
+        ctx.setStrokeColor(rgb(0xcfe2fa, 0.9)); ctx.setLineWidth(1.2)
+        ctx.addArc(center: CGPoint(x: cx - 6 + swirl, y: 9), radius: 6, startAngle: .pi * 0.1, endAngle: .pi * 0.9, clockwise: false)
         ctx.strokePath()
-        poly(ctx, [CGPoint(x: cx + 17, y: 25), CGPoint(x: cx + 21.5, y: 25.5), CGPoint(x: cx + 20, y: 31)], ice)
 
-        // Body.
-        oval(ctx, CGPoint(x: cx, y: 24), 20, 17, skin)
-        oval(ctx, CGPoint(x: cx, y: 22.5), 12, 10, belly)
-
-        // Arms: tucked while flying, raised when grabbing or startled.
-        ctx.setStrokeColor(skin); ctx.setLineWidth(3.4)
-        switch pose {
-        case .flyA, .flyB:
-            let wave: CGFloat = pose == .flyA ? 0 : 2
-            ctx.move(to: CGPoint(x: cx - 8, y: 27)); ctx.addLine(to: CGPoint(x: cx - 14, y: 22 + wave))
-            ctx.move(to: CGPoint(x: cx + 8, y: 27)); ctx.addLine(to: CGPoint(x: cx + 14, y: 22 + 2 - wave))
-        case .grab, .shooed:
-            ctx.move(to: CGPoint(x: cx - 8, y: 28)); ctx.addLine(to: CGPoint(x: cx - 16, y: 37))
-            ctx.move(to: CGPoint(x: cx + 8, y: 28)); ctx.addLine(to: CGPoint(x: cx + 16, y: 37))
-        }
-        ctx.strokePath()
-        // Claws.
-        let hands: [CGPoint] = (pose == .grab || pose == .shooed)
-            ? [CGPoint(x: cx - 16, y: 37.5), CGPoint(x: cx + 16, y: 37.5)]
-            : [CGPoint(x: cx - 14.5, y: 21.5 + (pose == .flyA ? 0 : 2)), CGPoint(x: cx + 14.5, y: 23.5 - (pose == .flyA ? 0 : 2))]
-        for h in hands { oval(ctx, h, 4.6, 4.6, skinDark) }
-
-        // Big pointy ears.
-        let headY: CGFloat = 39
+        // Short stocky legs with grey feet.
         for side in [-1.0, 1.0] as [CGFloat] {
-            poly(ctx, [CGPoint(x: cx + side * 9, y: headY + 4), CGPoint(x: cx + side * 25, y: headY + 12), CGPoint(x: cx + side * 11, y: headY - 3)], skin)
-            poly(ctx, [CGPoint(x: cx + side * 11, y: headY + 2.5), CGPoint(x: cx + side * 21, y: headY + 8.5), CGPoint(x: cx + side * 12, y: headY - 1)], rgb(0xa9bde0))
+            oval(ctx, CGPoint(x: cx + side * 8.5, y: 13), 14, 13, furShade)
+            oval(ctx, CGPoint(x: cx + side * 9.5, y: 9), 11, 5, skin)
         }
 
-        // Head.
-        oval(ctx, CGPoint(x: cx, y: headY), 26, 22, skin)
-
-        // A crest of little icicles on top.
-        for (dx, h) in [(-6.0, 6.0), (0.0, 9.0), (6.0, 6.0)] as [(CGFloat, CGFloat)] {
-            poly(ctx, [CGPoint(x: cx + dx - 3, y: headY + 9), CGPoint(x: cx + dx + 3, y: headY + 9), CGPoint(x: cx + dx, y: headY + 9 + h)], ice)
+        // Arms: long and heavy like a gorilla's. They hang low while it swoops,
+        // and go up over its head to grab a gift (or flail when it's chased off).
+        let raised = pose == .grab || pose == .shooed
+        let swing: CGFloat = pose == .flyA ? 0 : 2.5
+        let shoulders = [CGPoint(x: cx - 16, y: 38), CGPoint(x: cx + 16, y: 38)]
+        let fists: [CGPoint] = raised
+            ? (pose == .shooed ? [CGPoint(x: cx - 27, y: 60), CGPoint(x: cx + 25, y: 63)]
+                               : [CGPoint(x: cx - 20, y: 64), CGPoint(x: cx + 20, y: 64)])
+            : [CGPoint(x: cx - 25, y: 12 + swing), CGPoint(x: cx + 25, y: 14.5 - swing)]
+        for (sh, fist) in zip(shoulders, fists) {
+            ctx.setStrokeColor(furLine); ctx.setLineWidth(13.5)
+            ctx.move(to: sh); ctx.addLine(to: fist); ctx.strokePath()
+            ctx.setStrokeColor(fur); ctx.setLineWidth(12)
+            ctx.move(to: sh); ctx.addLine(to: fist); ctx.strokePath()
         }
 
-        // Eyes.
-        let eyeY = headY + 1.5
+        // Big barrel body and hulking shoulders, with shaggy tufts.
+        oval(ctx, CGPoint(x: cx, y: 29), 41, 36, furLine)
+        oval(ctx, CGPoint(x: cx, y: 29), 39, 34, fur)
+        for side in [-1.0, 1.0] as [CGFloat] {
+            oval(ctx, CGPoint(x: cx + side * 15, y: 39), 20, 17, fur)
+        }
+        for (x, y) in [(cx - 19, 22.0), (cx + 19, 22.0), (cx - 14, 15.0), (cx + 14, 15.0), (cx - 21, 31.0), (cx + 21, 31.0)] as [(CGFloat, CGFloat)] {
+            poly(ctx, [CGPoint(x: x - 2.5, y: y + 2), CGPoint(x: x + 2.5, y: y + 2), CGPoint(x: x + (x < cx ? -2.5 : 2.5), y: y - 3)], fur)
+        }
+        // Bare chest, the way a gorilla's is.
+        oval(ctx, CGPoint(x: cx, y: 27), 17, 14, skinLight)
+        ctx.setStrokeColor(skin); ctx.setLineWidth(1)
+        ctx.move(to: CGPoint(x: cx, y: 32)); ctx.addLine(to: CGPoint(x: cx, y: 24)); ctx.strokePath()
+
+        // Big fists (drawn after the body so the hanging ones show in front).
+        for fist in fists {
+            oval(ctx, fist, 12.5, 11, furShade)
+            oval(ctx, CGPoint(x: fist.x, y: fist.y - (raised ? -1.5 : 1.5)), 9, 5.5, skin)
+        }
+
+        // Head: sits low between the shoulders, with a tall crest.
+        let hy: CGFloat = 48
+        oval(ctx, CGPoint(x: cx, y: hy + 7), 15, 11, fur)            // crest
+        oval(ctx, CGPoint(x: cx, y: hy), 24, 21, fur)
+        // Face.
+        oval(ctx, CGPoint(x: cx, y: hy - 1.5), 16.5, 14, skin)
+        oval(ctx, CGPoint(x: cx, y: hy - 5), 13, 7.5, skinLight)        // muzzle
+        // Heavy brow.
+        ctx.setFillColor(rgb(0x6d82a8))
+        ctx.addPath(CGPath(roundedRect: CGRect(x: cx - 8.5, y: hy + 1.8, width: 17, height: 3.4), cornerWidth: 1.7, cornerHeight: 1.7, transform: nil))
+        ctx.fillPath()
+
         if pose == .shooed {
-            // Dizzy swirls after being chased off.
-            ctx.setStrokeColor(ink); ctx.setLineWidth(1.4)
-            for ex in [cx - 6, cx + 6] {
-                ctx.addArc(center: CGPoint(x: ex, y: eyeY), radius: 3, startAngle: 0, endAngle: .pi * 1.6, clockwise: false)
-                ctx.move(to: CGPoint(x: ex + 1.2, y: eyeY))
-                ctx.addArc(center: CGPoint(x: ex, y: eyeY), radius: 1.2, startAngle: 0, endAngle: .pi * 1.5, clockwise: false)
+            // Dizzy swirls and an "oof" mouth.
+            ctx.setStrokeColor(ink); ctx.setLineWidth(1.2)
+            for ex in [cx - 4, cx + 4] {
+                ctx.addArc(center: CGPoint(x: ex, y: hy - 0.5), radius: 2.4, startAngle: 0, endAngle: .pi * 1.6, clockwise: false)
                 ctx.strokePath()
             }
+            oval(ctx, CGPoint(x: cx, y: hy - 7), 4.5, 4.5, ink)
         } else {
-            for ex in [cx - 6, cx + 6] {
-                oval(ctx, CGPoint(x: ex, y: eyeY), 7.5, 6, rgb(0xffe066))
-                oval(ctx, CGPoint(x: ex + 0.6, y: eyeY), 2, 5, ink)         // sly slit pupils
+            // Icy glowing eyes under an angry frown.
+            ctx.setShadow(offset: .zero, blur: 3, color: rgb(0x7ff0ff))
+            for ex in [cx - 4, cx + 4] {
+                oval(ctx, CGPoint(x: ex, y: hy - 0.3), 3.6, 2.8, rgb(0xa8f6ff))
             }
-            // Mischievous brows slanting toward the middle.
-            ctx.setStrokeColor(ink); ctx.setLineWidth(1.8)
-            ctx.move(to: CGPoint(x: cx - 10, y: eyeY + 5.5)); ctx.addLine(to: CGPoint(x: cx - 2.5, y: eyeY + 3.2))
-            ctx.move(to: CGPoint(x: cx + 10, y: eyeY + 5.5)); ctx.addLine(to: CGPoint(x: cx + 2.5, y: eyeY + 3.2))
+            ctx.setShadow(offset: .zero, blur: 0, color: nil)
+            for ex in [cx - 4, cx + 4] { oval(ctx, CGPoint(x: ex, y: hy - 0.3), 1.3, 1.6, ink) }
+            ctx.setStrokeColor(ink); ctx.setLineWidth(1.6)
+            ctx.move(to: CGPoint(x: cx - 7.5, y: hy + 3)); ctx.addLine(to: CGPoint(x: cx - 1.2, y: hy + 1.2))
+            ctx.move(to: CGPoint(x: cx + 7.5, y: hy + 3)); ctx.addLine(to: CGPoint(x: cx + 1.2, y: hy + 1.2))
             ctx.strokePath()
-        }
-
-        // Mouth: a wide sly grin with two little fangs, or an "o" when startled.
-        let mouthY = headY - 5.5
-        if pose == .shooed {
-            oval(ctx, CGPoint(x: cx, y: mouthY), 5, 5.5, ink)
-        } else {
+            // A snarl with fangs.
             ctx.setFillColor(ink)
-            ctx.move(to: CGPoint(x: cx - 7.5, y: mouthY + 1.5))
-            ctx.addQuadCurve(to: CGPoint(x: cx + 7.5, y: mouthY + 1.5), control: CGPoint(x: cx, y: mouthY - 6))
-            ctx.addQuadCurve(to: CGPoint(x: cx - 7.5, y: mouthY + 1.5), control: CGPoint(x: cx, y: mouthY - 0.5))
+            ctx.addPath(CGPath(roundedRect: CGRect(x: cx - 5, y: hy - 9, width: 10, height: 3.6), cornerWidth: 1.8, cornerHeight: 1.8, transform: nil))
             ctx.fillPath()
-            poly(ctx, [CGPoint(x: cx - 4, y: mouthY), CGPoint(x: cx - 2, y: mouthY), CGPoint(x: cx - 3, y: mouthY - 2.6)], rgb(0xffffff))
-            poly(ctx, [CGPoint(x: cx + 2, y: mouthY), CGPoint(x: cx + 4, y: mouthY), CGPoint(x: cx + 3, y: mouthY - 2.6)], rgb(0xffffff))
+            for fx in [cx - 3.4, cx + 1.8] {
+                poly(ctx, [CGPoint(x: fx, y: hy - 5.4), CGPoint(x: fx + 1.6, y: hy - 5.4), CGPoint(x: fx + 0.8, y: hy - 8)], rgb(0xffffff))
+            }
         }
-        // Frosty cheeks.
-        oval(ctx, CGPoint(x: cx - 9, y: mouthY + 1.5), 4, 2.4, rgb(0xc7a6e0, 0.7))
-        oval(ctx, CGPoint(x: cx + 9, y: mouthY + 1.5), 4, 2.4, rgb(0xc7a6e0, 0.7))
+        // Wide flat nose.
+        oval(ctx, CGPoint(x: cx, y: hy - 3.6), 6.5, 2.8, rgb(0x5d7098))
+        oval(ctx, CGPoint(x: cx - 1.6, y: hy - 3.8), 1.3, 1.1, ink)
+        oval(ctx, CGPoint(x: cx + 1.6, y: hy - 3.8), 1.3, 1.1, ink)
     }
 }
 
