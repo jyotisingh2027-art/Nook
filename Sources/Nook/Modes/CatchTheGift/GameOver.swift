@@ -75,7 +75,7 @@ struct GameOverView: View {
                 Text("\(result.score)")
                     .font(.system(size: 64, weight: .black, design: .rounded))
                     .foregroundColor(cream)
-                Text(result.score == 1 ? "gift caught" : "gifts caught")
+                Text(result.score == 1 ? "point" : "points")
                     .font(.system(size: 15, weight: .medium, design: .rounded))
                     .foregroundColor(lilac)
             }

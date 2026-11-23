@@ -200,7 +200,7 @@ final class OverlayController: WindowTrackerObserver {
         modeTimer = nil
         guard let mode else { updateMouseCapture(); return }
 
-        nextSpawnAt = CACurrentMediaTime() + (mode == .catchGift ? 2.5 : 0.8)   // the first one comes quickly
+        nextSpawnAt = CACurrentMediaTime() + (mode == .catchGift ? 1.5 : 0.8)   // the first one comes quickly
         let t = Timer(timeInterval: 0.1, repeats: true) { [weak self] _ in self?.modeTick() }
         RunLoop.main.add(t, forMode: .common)
         modeTimer = t
@@ -228,8 +228,8 @@ final class OverlayController: WindowTrackerObserver {
                 wait = Double.random(in: 1.2...3.0)
             } else {
                 ready.randomElement()?.scene.dropGift()
-                // Gifts come more often as your score climbs.
-                wait = Double.random(in: 4.5...8) * max(0.28, pow(0.94, Double(GiftStats.shared.score)))
+                // A new wave every few seconds, coming quicker as your score climbs.
+                wait = Double.random(in: 3.0...4.5) * max(0.45, pow(0.97, Double(GiftStats.shared.score)))
             }
             nextSpawnAt = now + wait * (PowerMonitor.shared.shouldSaveEnergy ? 1.5 : 1)
         }

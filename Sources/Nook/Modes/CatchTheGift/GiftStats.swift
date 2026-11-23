@@ -120,12 +120,12 @@ final class GiftStats {
     private var extras: [DecorationKind] { DecorationKind.allCases.filter { $0.lockedByDefault } }
 
     /// Records a catch. Returns the surprise decoration it unlocked, if any.
-    func recordCatch() -> DecorationKind? {
+    func recordCatch(points: Int = 1) -> DecorationKind? {
         caught += 1
         streak += 1
         if streak > bestStreak { bestStreak = streak }
         if inGame {
-            score += 1
+            score += points
             gameStreakBest = max(gameStreakBest, streak)
         }
 

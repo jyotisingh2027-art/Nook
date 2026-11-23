@@ -7,6 +7,7 @@ final class GiftLayer: SKNode {
 
     private struct Gift {
         let id: Int
+        let kind: CatchItemKind
         let node: SKNode
         let box: SKSpriteNode
         var pos: CGPoint
@@ -17,9 +18,6 @@ final class GiftLayer: SKNode {
         let radius: CGFloat      // generous, so gifts are easy to click
     }
 
-    private static let boxColours = ["red", "green", "blue", "gold", "pink", "silver"]
-    private static let ribbonColours = ["gold", "red", "silver", "white"]
-
     private var gifts: [Gift] = []
     private var nextGiftID = 0
 
@@ -28,8 +26,9 @@ final class GiftLayer: SKNode {
     private enum ImpState { case sneaking, escaping, leaving, shooed }
 
     private final class Imp {
-        let node = SKSpriteNode(texture: FrostImpArt.texture(.flyA))
-        var pos: CGPoint
+        let node = SKSpriteNode(texture: FrostImpArt.texture(.walk(0)))
+        var pos: CGPoint          // where its feet are
+        var walked: CGFloat = 0   // drives the step animation
         let targetID: Int
         let homeX: CGFloat
         var state = ImpState.sneaking
@@ -39,7 +38,9 @@ final class GiftLayer: SKNode {
         init(pos: CGPoint, targetID: Int, homeX: CGFloat) {
             self.pos = pos; self.targetID = targetID; self.homeX = homeX
         }
-        var bodyCentre: CGPoint { CGPoint(x: pos.x, y: pos.y + 4) }
+        var bodyCentre: CGPoint { CGPoint(x: pos.x, y: pos.y + 50) }
+        /// How high it can reach with its arms up.
+        static let reach: CGFloat = 92
     }
 
     private var imp: Imp?
@@ -75,48 +76,84 @@ final class GiftLayer: SKNode {
 
     // MARK: - Dropping
 
-    /// Drops one new gift from above the top of a screen of the given size.
+    /// Drops a wave of Christmas things from above the top of the screen: always at least one gift,
+    /// plus cookies, candy canes, ornaments, stockings and now and then a golden star.
+    /// Waves get bigger as your score climbs.
     func drop(in size: CGSize) {
-        guard isActive, size.width > 200 else { return }
+        guard isActive, size.width > 300 else { return }
+        let count = min(6, 2 + GiftStats.shared.score / 8 + Int.random(in: 0...1))
+        let slot = (size.width - 120) / CGFloat(count)
+        let order = Array(0..<count).shuffled()
+        var newGifts: [Int] = []
+        var hasStar = false
+        for k in 0..<count {
+            var kind = k == 0 ? .gift : CatchItemKind.random()
+            if kind == .goldenStar { if hasStar { kind = .cookie }; hasStar = true }
+            // Spread across the screen, and staggered so they don't arrive all at once.
+            let x = 60 + slot * (CGFloat(order[k]) + CGFloat.random(in: 0.2...0.8))
+            let y = size.height + kind.size.height + CGFloat.random(in: 0...220)
+            let id = spawn(kind, at: CGPoint(x: x, y: y))
+            if kind == .gift { newGifts.append(id) }
+        }
+        // Now and then the yeti spots a gift and stomps in to steal it.
+        if imp == nil, pendingImp == nil, GiftStats.shared.caught >= 1, Double.random(in: 0...1) < 0.45,
+           let target = newGifts.randomElement() {
+            pendingImp = (target, CGFloat.random(in: 0.3...1.2))
+        }
+    }
 
-        let colour = Self.boxColours.randomElement()!
-        let ribbon = Self.ribbonColours.filter { $0 != colour }.randomElement()!
-        let art = DecorationRenderer.shared.render(
-            PlacedDecoration(kind: .giftBox, x: 0, y: 0, scale: 0.82,
-                             options: ["color": colour, "ribbon": ribbon], seed: 1))
-
+    private func spawn(_ kind: CatchItemKind, at start: CGPoint) -> Int {
+        let size = kind.size
         let node = SKNode()
+
+        // A warm pulsing glow behind it.
         let glow = SKSpriteNode(texture: SnowTextures.shared.dot)
-        glow.size = CGSize(width: art.size.width * 2.1, height: art.size.width * 2.1)
-        glow.color = NSColor(red: 1, green: 0.86, blue: 0.5, alpha: 1)
+        let g = max(size.width, size.height) * 2
+        glow.size = CGSize(width: g, height: g)
+        glow.color = kind.glow
         glow.colorBlendFactor = 1
-        glow.alpha = 0.35
-        glow.run(.repeatForever(.sequence([.fadeAlpha(to: 0.6, duration: 0.7), .fadeAlpha(to: 0.3, duration: 0.7)])))
+        glow.alpha = 0.55
+        glow.run(.repeatForever(.sequence([.fadeAlpha(to: 0.85, duration: 0.5), .fadeAlpha(to: 0.5, duration: 0.5)])))
         node.addChild(glow)
 
-        let box = SKSpriteNode(texture: SKTexture(cgImage: art.image))
-        box.size = art.size
-        node.addChild(box)
+        let sprite = SKSpriteNode(texture: CatchItemArt.texture(kind, variant: Int.random(in: 0..<10)))
+        sprite.size = size
+        node.addChild(sprite)
 
-        // The more you've caught this game, the faster gifts fall.
-        let streakBoost = CGFloat(min(GiftStats.shared.score, 40)) * 3.5
-        let margin = art.size.width
-        let start = CGPoint(x: CGFloat.random(in: margin...(size.width - margin)),
-                            y: size.height + art.size.height)
+        // Sparkles twinkling around it.
+        let n = kind == .goldenStar ? 5 : 3
+        for i in 0..<n {
+            let sp = SKSpriteNode(texture: CatchItemArt.sparkle)
+            let d = CGFloat.random(in: 10...16)
+            sp.size = CGSize(width: d, height: d)
+            let a = CGFloat(i) / CGFloat(n) * 2 * .pi + CGFloat.random(in: -0.5...0.5)
+            sp.position = CGPoint(x: cos(a) * size.width * 0.62, y: sin(a) * size.height * 0.62)
+            sp.setScale(0)
+            sp.zPosition = 1
+            sp.run(.sequence([
+                .wait(forDuration: Double.random(in: 0...0.8)),
+                .repeatForever(.sequence([
+                    .group([.scale(to: 1, duration: 0.25), .rotate(byAngle: 0.8, duration: 0.25)]),
+                    .scale(to: 0, duration: 0.3),
+                    .wait(forDuration: Double.random(in: 0.2...0.7))
+                ]))
+            ]))
+            node.addChild(sp)
+        }
+
         node.position = start
         addChild(node)
 
+        // The more points you have this game, the faster things fall.
+        let boost = CGFloat(min(GiftStats.shared.score, 60)) * 2.2
         nextGiftID += 1
-        // Now and then the frost imp spots a gift and sneaks in to steal it.
-        if imp == nil, pendingImp == nil, GiftStats.shared.caught >= 1, Double.random(in: 0...1) < 0.4 {
-            pendingImp = (nextGiftID, CGFloat.random(in: 1.0...2.2))
-        }
-        gifts.append(Gift(id: nextGiftID, node: node, box: box, pos: start,
-                          fallSpeed: (CGFloat.random(in: 55...75) + streakBoost) * (energySaving ? 0.9 : 1),
+        gifts.append(Gift(id: nextGiftID, kind: kind, node: node, box: sprite, pos: start,
+                          fallSpeed: (CGFloat.random(in: 60...85) + boost) * (energySaving ? 0.9 : 1) * (kind == .goldenStar ? 1.25 : 1),
                           phase: CGFloat.random(in: 0...(2 * .pi)),
-                          sway: CGFloat.random(in: 18...40),
-                          halfHeight: art.size.height / 2,
-                          radius: max(art.size.width, art.size.height) * 0.6 + 8))
+                          sway: CGFloat.random(in: 14...34),
+                          halfHeight: size.height / 2,
+                          radius: max(size.width, size.height) * 0.6 + 8))
+        return nextGiftID
     }
 
     // MARK: - Every frame
@@ -152,7 +189,7 @@ final class GiftLayer: SKNode {
             if g.pos.y - g.halfHeight <= floorY(at: g.pos.x) {
                 if let imp, imp.targetID == g.id, imp.state == .sneaking {
                     imp.state = .leaving
-                    floatText("Hmph!", at: CGPoint(x: imp.pos.x, y: imp.pos.y + 44), size: 18)
+                    floatText("Hmph!", at: CGPoint(x: imp.pos.x, y: imp.pos.y + 120), size: 18)
                 }
                 land(g)
                 gifts.remove(at: i)
@@ -173,11 +210,11 @@ final class GiftLayer: SKNode {
             if p.delay <= 0 {
                 pendingImp = nil
                 if let g = gifts.first(where: { $0.id == p.giftID }), let w = scene?.size.width {
-                    // It comes in from the side nearest the gift, a little below it.
-                    let fromLeft = g.pos.x < w / 2
-                    let homeX: CGFloat = fromLeft ? -50 : w + 50
-                    let i = Imp(pos: CGPoint(x: homeX, y: max(90, g.pos.y - 150)), targetID: g.id, homeX: homeX)
-                    i.node.size = CGSize(width: FrostImpArt.size.width * 1.3, height: FrostImpArt.size.height * 1.3)
+                    // It stomps in from the side nearest the gift, along the ground (or the top of the Dock).
+                    let homeX: CGFloat = g.pos.x < w / 2 ? -60 : w + 60
+                    let i = Imp(pos: CGPoint(x: homeX, y: floorY(at: homeX)), targetID: g.id, homeX: homeX)
+                    i.node.size = CGSize(width: FrostImpArt.size.width * 1.25, height: FrostImpArt.size.height * 1.25)
+                    i.node.anchorPoint = CGPoint(x: 0.5, y: 0.02)
                     i.node.zPosition = 1
                     i.node.position = i.pos
                     addChild(i.node)
@@ -187,7 +224,14 @@ final class GiftLayer: SKNode {
         }
         guard let imp else { return }
         imp.t += dt
-        let bob = sin(imp.t * 5) * 3
+        let homeDir: CGFloat = imp.homeX < 0 ? -1 : 1
+
+        func walk(_ dx: CGFloat, carrying: Bool = false) {
+            imp.pos.x += dx
+            imp.walked += abs(dx)
+            let k = Int(imp.walked / 11) % 4
+            imp.node.texture = FrostImpArt.texture(carrying ? .carry(k) : .walk(k))
+        }
 
         switch imp.state {
         case .sneaking:
@@ -195,71 +239,69 @@ final class GiftLayer: SKNode {
                 imp.state = .leaving
                 return
             }
-            let target = CGPoint(x: g.pos.x, y: g.pos.y - 58)
-            let dx = target.x - imp.pos.x, dy = target.y - imp.pos.y
-            let d = max(0.001, hypot(dx, dy))
-            let speed: CGFloat = (100 + CGFloat(min(GiftStats.shared.streak, 10)) * 4) * (energySaving ? 0.9 : 1)
-            imp.pos.x += dx / d * speed * dt
-            imp.pos.y += dy / d * speed * dt
-            imp.node.texture = FrostImpArt.texture(Int(imp.t * 6) % 2 == 0 ? .flyA : .flyB)
-            imp.node.xScale = dx < 0 ? -1 : 1
-            if d < 22 { steal(g, by: imp) }
+            let dx = g.pos.x - imp.pos.x
+            if abs(dx) > 14 {
+                let speed = min(160, 90 + CGFloat(GiftStats.shared.score) * 1.5) * (energySaving ? 0.9 : 1)
+                walk(dx < 0 ? -min(-dx, speed * dt) : min(dx, speed * dt))
+            } else {
+                imp.node.texture = FrostImpArt.texture(.reach)
+            }
+            // Under the gift with its arms up: if the gift drops into its hands, it's gone.
+            if abs(dx) < 36, g.pos.y - g.halfHeight <= imp.pos.y + Imp.reach {
+                steal(g, by: imp)
+            }
         case .escaping:
-            imp.pos.x += (imp.homeX < 0 ? -1 : 1) * 240 * dt
-            imp.pos.y += 40 * dt
-            imp.node.texture = FrostImpArt.texture(.grab)
+            walk(homeDir * 200 * dt, carrying: true)
             if var c = imp.carried {
-                c.pos = CGPoint(x: imp.pos.x, y: imp.pos.y + 62 + bob)
+                c.pos = CGPoint(x: imp.pos.x, y: imp.pos.y + Imp.reach + c.halfHeight - 12)
                 c.node.position = c.pos
+                c.box.zRotation = 0
                 imp.carried = c
             }
         case .leaving:
-            imp.pos.x += (imp.homeX < 0 ? -1 : 1) * 170 * dt
-            imp.pos.y += 30 * dt
-            imp.node.texture = FrostImpArt.texture(Int(imp.t * 6) % 2 == 0 ? .flyA : .flyB)
-            imp.node.xScale = imp.homeX < 0 ? -1 : 1
+            walk(homeDir * 150 * dt)
         case .shooed:
-            imp.vel.dy -= 120 * dt
+            imp.vel.dy -= 500 * dt
             imp.pos.x += imp.vel.dx * dt
             imp.pos.y += imp.vel.dy * dt
-            imp.node.zRotation += 7 * dt
-            imp.node.alpha = max(0, imp.node.alpha - dt * 0.9)
+            imp.node.zRotation += homeDir * -4 * dt
+            imp.node.alpha = max(0, imp.node.alpha - dt * 0.8)
         }
-        imp.node.position = CGPoint(x: imp.pos.x, y: imp.pos.y + (imp.state == .shooed ? 0 : bob))
+        if imp.state != .shooed { imp.pos.y = floorY(at: imp.pos.x) }
+        imp.node.position = imp.pos
 
         let w = scene?.size.width ?? 2000
-        if imp.pos.x < -80 || imp.pos.x > w + 80 || imp.node.alpha <= 0.01 {
+        if imp.pos.x < -100 || imp.pos.x > w + 100 || imp.node.alpha <= 0.01 {
             imp.node.removeFromParent()
             imp.carried?.node.removeFromParent()
             self.imp = nil
         }
     }
 
-    /// The imp got there first: it grabs the gift and makes off with it.
+    /// The yeti got there first: it grabs the gift and makes off with it.
     private func steal(_ g: Gift, by imp: Imp) {
         gifts.removeAll { $0.id == g.id }
         imp.carried = g
         imp.state = .escaping
-        imp.node.xScale = imp.homeX < 0 ? -1 : 1
         GiftStats.shared.recordStolen()
-        lifeLostText(at: CGPoint(x: imp.pos.x, y: imp.pos.y + 100))
-        floatText("ROAR! Stolen!", at: CGPoint(x: imp.pos.x, y: imp.pos.y + 70), size: 20)
+        lifeLostText(at: CGPoint(x: imp.pos.x, y: imp.pos.y + 170))
+        floatText("ROAR! Stolen!", at: CGPoint(x: imp.pos.x, y: imp.pos.y + 140), size: 20)
     }
 
     /// Clicking the imp scares it off. If it was carrying a gift, the gift drops back down.
     private func shoo(_ imp: Imp) {
         imp.state = .shooed
         imp.node.texture = FrostImpArt.texture(.shooed)
-        imp.vel = CGVector(dx: (imp.homeX < 0 ? -1 : 1) * 160, dy: 230)
+        imp.vel = CGVector(dx: (imp.homeX < 0 ? -1 : 1) * 180, dy: 260)
         ModeEffects.burst(in: self, at: imp.bodyCentre, count: 16, colours: Self.iceColours, sizes: 4...9, distance: 30...80)
         GiftStats.shared.recordImpShooed()
         if var c = imp.carried {
             imp.carried = nil
             c.pos = CGPoint(x: c.pos.x, y: c.pos.y)
             gifts.append(c)
-            floatText("Shoo, yeti! Gift rescued!", at: CGPoint(x: imp.pos.x, y: imp.pos.y + 60), size: 20)
+            floatText("Shoo, yeti! Gift rescued!", at: CGPoint(x: imp.pos.x, y: imp.pos.y + 130), size: 20)
         } else {
-            floatText("Shoo, yeti!", at: CGPoint(x: imp.pos.x, y: imp.pos.y + 50), size: 20)
+            floatText("Shoo, yeti!", at: CGPoint(x: imp.pos.x, y: imp.pos.y + 120), size: 20)
         }
     }
 
@@ -273,10 +315,11 @@ final class GiftLayer: SKNode {
         return 2
     }
 
-    /// A missed gift settles where it fell, then fades away. The streak starts over.
+    /// A missed item settles where it fell, then fades away. Only a missed gift costs a life.
     private func land(_ g: Gift) {
         g.box.run(.rotate(toAngle: 0, duration: 0.2))
-        g.node.run(.sequence([.wait(forDuration: 1.4), .fadeOut(withDuration: 0.8), .removeFromParent()]))
+        g.node.run(.sequence([.wait(forDuration: g.kind.costsLife ? 1.4 : 0.6), .fadeOut(withDuration: 0.6), .removeFromParent()]))
+        guard g.kind.costsLife else { return }
         GiftStats.shared.recordMiss()
         lifeLostText(at: CGPoint(x: g.pos.x, y: g.pos.y + 40))
     }
@@ -301,15 +344,16 @@ final class GiftLayer: SKNode {
         let g = gifts.remove(at: i)
         if let imp, imp.targetID == g.id, imp.state == .sneaking {
             imp.state = .leaving
-            floatText("Grr!", at: CGPoint(x: imp.pos.x, y: imp.pos.y + 44), size: 18)
+            floatText("Grr!", at: CGPoint(x: imp.pos.x, y: imp.pos.y + 120), size: 18)
         }
         g.node.removeAllActions()
         g.node.run(.sequence([.group([.scale(to: 1.5, duration: 0.22), .fadeOut(withDuration: 0.22)]), .removeFromParent()]))
 
-        let revealed = GiftStats.shared.recordCatch()
+        let revealed = GiftStats.shared.recordCatch(points: g.kind.points)
         let streak = GiftStats.shared.streak
-        burst(at: g.pos, big: revealed != nil)
-        floatText(streak >= 2 ? "+1  ·  \(streak) in a row" : "+1", at: CGPoint(x: g.pos.x, y: g.pos.y + 34), size: 20)
+        burst(at: g.pos, big: revealed != nil || g.kind == .goldenStar)
+        let gain = "+\(g.kind.points)"
+        floatText(streak >= 3 ? "\(gain)  ·  \(streak) in a row" : gain, at: CGPoint(x: g.pos.x, y: g.pos.y + 34), size: g.kind.points > 1 ? 26 : 20)
         if let kind = revealed {
             floatText("Surprise unlocked: \(kind.title)!", at: CGPoint(x: g.pos.x, y: g.pos.y + 66), size: 24, hold: 2.2)
         }
@@ -388,7 +432,7 @@ final class GiftLayer: SKNode {
     /// A little "Ready? 3 lives. Go!" when a game starts.
     func announceStart() {
         guard let s = scene as? SeasonScene else { return }
-        floatText("Catch the Gift!  3 lives.  Go!", at: CGPoint(x: s.size.width / 2, y: s.size.height * 0.6), size: 26, hold: 1.4)
+        floatText("Catch the Gift!  Don't let the gifts drop.  3 lives!", at: CGPoint(x: s.size.width / 2, y: s.size.height * 0.6), size: 26, hold: 1.4)
     }
 
     // MARK: - Effects

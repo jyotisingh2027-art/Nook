@@ -1,13 +1,18 @@
 import AppKit
 import SpriteKit
 
-/// Nook's villain: a big white yeti, built like a gorilla, carried on a swirling gust of snow.
-/// In Catch the Gift it swoops in from the side to snatch a falling gift before you catch it.
+/// Nook's villain: a big white yeti, built like a gorilla, that walks on two legs.
+/// In Catch the Gift it stomps in from the side, gets under a falling gift and reaches up to grab it.
 /// Click it to chase it off. (The code still calls it the "imp".)
 enum FrostImpArt {
-    static let size = CGSize(width: 64, height: 77)
+    static let size = CGSize(width: 64, height: 82)
 
-    enum Pose { case flyA, flyB, grab, shooed }
+    enum Pose: Hashable {
+        case walk(Int)     // 4-step walk cycle, arms swinging
+        case carry(Int)    // walking with a stolen gift held overhead
+        case reach         // standing, arms up, waiting for the gift to drop in
+        case shooed        // dizzy, arms flailing
+    }
 
     private static var cache: [Pose: SKTexture] = [:]
 
@@ -47,26 +52,38 @@ enum FrostImpArt {
         let skin = rgb(0x8a9fc2), skinLight = rgb(0xaebfdc), ink = rgb(0x1b2033)
         let cx: CGFloat = 32
 
-        // The swirling gust of snow that carries it.
-        let swirl: CGFloat = pose == .flyB ? 2 : 0
-        oval(ctx, CGPoint(x: cx, y: 5), 50, 9, rgb(0xdbe9fb, 0.55))
-        oval(ctx, CGPoint(x: cx - 14 + swirl, y: 7), 18, 9, rgb(0xffffff, 0.8))
-        oval(ctx, CGPoint(x: cx + 2 - swirl, y: 8.5), 22, 10, rgb(0xffffff, 0.85))
-        oval(ctx, CGPoint(x: cx + 16 + swirl, y: 6.5), 16, 8, rgb(0xffffff, 0.75))
-        ctx.setStrokeColor(rgb(0xcfe2fa, 0.9)); ctx.setLineWidth(1.2)
-        ctx.addArc(center: CGPoint(x: cx - 6 + swirl, y: 9), radius: 6, startAngle: .pi * 0.1, endAngle: .pi * 0.9, clockwise: false)
-        ctx.strokePath()
-
-        // Short stocky legs with grey feet.
-        for side in [-1.0, 1.0] as [CGFloat] {
-            oval(ctx, CGPoint(x: cx + side * 8.5, y: 13), 14, 13, furShade)
-            oval(ctx, CGPoint(x: cx + side * 9.5, y: 9), 11, 5, skin)
+        var legPhase: Int?
+        switch pose {
+        case .walk(let k), .carry(let k): legPhase = k % 4
+        default: legPhase = nil
         }
+
+        // Two stocky legs: one lifts and steps while the other takes the weight.
+        for side in [-1.0, 1.0] as [CGFloat] {
+            let lifted = (legPhase == 0 && side < 0) || (legPhase == 2 && side > 0)
+            let hip = CGPoint(x: cx + side * 9, y: 22)
+            let foot = CGPoint(x: cx + side * (lifted ? 8 : 11), y: lifted ? 11 : 5)
+            ctx.setStrokeColor(furLine); ctx.setLineWidth(13)
+            ctx.move(to: hip); ctx.addLine(to: foot); ctx.strokePath()
+            ctx.setStrokeColor(furShade); ctx.setLineWidth(11.5)
+            ctx.move(to: hip); ctx.addLine(to: foot); ctx.strokePath()
+            oval(ctx, CGPoint(x: foot.x + side * 1.5, y: foot.y - 2), 14, 6, skin)
+        }
+
+        // The upper body bobs with each step and rocks toward the planted foot.
+        let bob: CGFloat = legPhase.map { $0 % 2 == 1 ? -1.2 : 0.8 } ?? 0
+        let tilt: CGFloat = legPhase.map { [0.06, 0, -0.06, 0][$0] } ?? 0
+        ctx.saveGState()
+        ctx.translateBy(x: cx, y: 22)
+        ctx.rotate(by: tilt)
+        ctx.translateBy(x: -cx, y: -22 + 5 + bob)
 
         // Arms: long and heavy like a gorilla's. They hang low while it swoops,
         // and go up over its head to grab a gift (or flail when it's chased off).
-        let raised = pose == .grab || pose == .shooed
-        let swing: CGFloat = pose == .flyA ? 0 : 2.5
+        var raised = false
+        if case .carry = pose { raised = true }
+        if pose == .reach || pose == .shooed { raised = true }
+        let swing: CGFloat = legPhase.map { [3, 0, -3, 0][$0] } ?? 0
         let shoulders = [CGPoint(x: cx - 16, y: 38), CGPoint(x: cx + 16, y: 38)]
         let fists: [CGPoint] = raised
             ? (pose == .shooed ? [CGPoint(x: cx - 27, y: 60), CGPoint(x: cx + 25, y: 63)]
@@ -143,6 +160,7 @@ enum FrostImpArt {
         oval(ctx, CGPoint(x: cx, y: hy - 3.6), 6.5, 2.8, rgb(0x5d7098))
         oval(ctx, CGPoint(x: cx - 1.6, y: hy - 3.8), 1.3, 1.1, ink)
         oval(ctx, CGPoint(x: cx + 1.6, y: hy - 3.8), 1.3, 1.1, ink)
+        ctx.restoreGState()
     }
 }
 

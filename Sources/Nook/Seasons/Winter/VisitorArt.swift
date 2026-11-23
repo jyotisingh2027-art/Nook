@@ -333,10 +333,14 @@ extension VisitorArt {
             [bunnyCrouch, bunnyHop, bunnySitUp],
             [shoveller(.walkA, outfit: o[0]), shoveller(.walkB, outfit: o[0]), shoveller(.scoop, outfit: o[1]),
              shoveller(.toss, outfit: o[2]), shoveller(.walkA, outfit: o[3])],
-            [FrostImpArt.texture(.flyA), FrostImpArt.texture(.flyB), FrostImpArt.texture(.grab), FrostImpArt.texture(.shooed)],
+            [FrostImpArt.texture(.walk(0)), FrostImpArt.texture(.walk(1)), FrostImpArt.texture(.walk(2)), FrostImpArt.texture(.walk(3)),
+             FrostImpArt.texture(.reach), FrostImpArt.texture(.shooed)],
+            [CatchItemArt.texture(.gift, variant: 0), CatchItemArt.texture(.gift, variant: 2), CatchItemArt.texture(.cookie, variant: 0),
+             CatchItemArt.texture(.candyCane, variant: 0), CatchItemArt.texture(.ornament, variant: 2),
+             CatchItemArt.texture(.stocking, variant: 0), CatchItemArt.texture(.goldenStar, variant: 0)],
         ]
         let cell: CGFloat = 80, scale: CGFloat = 3
-        let W = cell * 6, H = cell * CGFloat(rows.count)
+        let W = cell * 7, H = cell * CGFloat(rows.count)
         let ctx = CGContext(data: nil, width: Int(W * scale), height: Int(H * scale), bitsPerComponent: 8, bytesPerRow: 0,
                             space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
         ctx.scaleBy(x: scale, y: scale)
