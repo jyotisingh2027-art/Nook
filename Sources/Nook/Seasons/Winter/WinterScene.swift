@@ -359,12 +359,16 @@ final class WinterScene: SeasonScene {
             live.insert(s.key)
         }
 
-        // Snow also settles along the bottom of the screen, behind every window and the Dock.
-        let groundBlocked = inFront.filter { $0.minY < groundSnowMax * 1.6 && $0.maxY > 0 }.map { $0.minX...$0.maxX }
-        let ground = Surface(key: .ground, minX: 0, maxX: size.width, y: 0, blocked: groundBlocked)
-        upsertPile(for: ground, maxHeight: groundSnowMax)
-        newSurfaces.append(ground)
-        live.insert(.ground)
+        // With no Dock on this screen (hidden, or on the side), snow settles along the bottom
+        // of the screen instead, and visitors can walk there. When the Dock is showing,
+        // everything stays on top of it rather than down among the apps.
+        if !live.contains(.dock) {
+            let groundBlocked = inFront.filter { $0.minY < groundSnowMax * 1.6 && $0.maxY > 0 }.map { $0.minX...$0.maxX }
+            let ground = Surface(key: .ground, minX: 0, maxX: size.width, y: 0, blocked: groundBlocked)
+            upsertPile(for: ground, maxHeight: groundSnowMax)
+            newSurfaces.append(ground)
+            live.insert(.ground)
+        }
 
         for (key, pile) in Array(piles) where !live.contains(key) {
             piles[key] = nil
