@@ -1,3 +1,4 @@
+import QuartzCore
 import SpriteKit
 
 /// A season (winter, autumn, spring, rain…) supplies the scene drawn on each screen.
@@ -19,6 +20,9 @@ class SeasonScene: SKScene {
     /// Decorations are shared by every season, so the base scene owns them.
     let decorationLayer: DecorationLayer
 
+    /// Falling gifts for Catch the Gift. Every season gets the game for free.
+    let giftLayer = GiftLayer()
+
     /// False when the user pauses the weather; decorations still show.
     var weatherVisible = true { didSet { if oldValue != weatherVisible { weatherVisibilityChanged() } } }
 
@@ -36,6 +40,20 @@ class SeasonScene: SKScene {
         self.decorationLayer = DecorationLayer(screenOrigin: screenFrame.origin)
         super.init(size: screenFrame.size)
         addChild(decorationLayer)
+        addChild(giftLayer)
+    }
+
+    /// Runs after the season's own update each frame.
+    override func didFinishUpdate() {
+        giftLayer.step(CACurrentMediaTime())
+    }
+
+    // MARK: - Catch the Gift (global coordinates)
+
+    func dropGift() { giftLayer.drop(in: size) }
+
+    func giftHit(atGlobal p: CGPoint) -> Bool {
+        giftLayer.hitTest(CGPoint(x: p.x - screenFrame.minX, y: p.y - screenFrame.minY))
     }
 
     func weatherVisibilityChanged() {}
@@ -47,7 +65,11 @@ class SeasonScene: SKScene {
         return CGPoint(x: p.x + screenFrame.minX, y: p.y + screenFrame.minY)
     }
 
-    override func mouseDown(with event: NSEvent) { DecorationInteraction.shared.mouseDown(at: globalPoint(event), event: event) }
+    override func mouseDown(with event: NSEvent) {
+        let p = globalPoint(event)
+        if giftLayer.catchGift(at: CGPoint(x: p.x - screenFrame.minX, y: p.y - screenFrame.minY)) { return }
+        DecorationInteraction.shared.mouseDown(at: p, event: event)
+    }
     override func mouseDragged(with event: NSEvent) { DecorationInteraction.shared.mouseDragged(to: globalPoint(event)) }
     override func mouseUp(with event: NSEvent) { DecorationInteraction.shared.mouseUp() }
     override func scrollWheel(with event: NSEvent) { DecorationInteraction.shared.scroll(at: globalPoint(event), event: event) }

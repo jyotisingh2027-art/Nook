@@ -23,7 +23,13 @@ final class OverlayController: WindowTrackerObserver {
     private var dockRect: CGRect?
     private var dockRefreshCounter = 0
     private var mouseMonitors: [Any] = []
-    private var hoveringDecoration = false
+
+    private enum Hover { case none, decoration, gift }
+    private var hover = Hover.none
+
+    // Catch the Gift
+    private var giftTimer: Timer?
+    private var nextGiftAt: CFTimeInterval = 0
 
     init(season: Season) {
         self.season = season
@@ -78,6 +84,7 @@ final class OverlayController: WindowTrackerObserver {
             scene.backgroundColor = .clear
             view.presentScene(scene)
             scene.decorationLayer.sync()
+            scene.giftLayer.isActive = giftsOn
 
             NotificationCenter.default.addObserver(self, selector: #selector(occlusionChanged(_:)),
                                                    name: NSWindow.didChangeOcclusionStateNotification, object: window)
@@ -153,8 +160,44 @@ final class OverlayController: WindowTrackerObserver {
             o.scene.snowDensity = amount.density
             o.scene.snowSpeed = amount.speed
             o.scene.snowBuildUp = amount.buildUp
+            o.scene.giftLayer.isActive = giftsOn
         }
+        updateGiftTimer()
         updateRunState()
+    }
+
+    // MARK: - Catch the Gift
+
+    /// Gifts fall only in Catch the Gift mode, and never while the snow is paused.
+    private var giftsOn: Bool { Settings.shared.mode == .catchGift && !Settings.shared.isPaused }
+
+    private func updateGiftTimer() {
+        if giftsOn {
+            guard giftTimer == nil else { return }
+            nextGiftAt = CACurrentMediaTime() + 2.5   // the first gift comes quickly
+            let t = Timer(timeInterval: 0.1, repeats: true) { [weak self] _ in self?.giftTick() }
+            RunLoop.main.add(t, forMode: .common)
+            giftTimer = t
+        } else {
+            giftTimer?.invalidate()
+            giftTimer = nil
+            updateMouseCapture()
+        }
+    }
+
+    private func giftTick() {
+        let now = CACurrentMediaTime()
+        if now >= nextGiftAt {
+            // Drop on one screen that's awake and showing, chosen at random.
+            let ready = overlays.filter { !$0.view.isPaused && $0.window.isVisible }
+            ready.randomElement()?.scene.dropGift()
+            let wait = Double.random(in: 6...14) * (PowerMonitor.shared.shouldSaveEnergy ? 1.5 : 1)
+            nextGiftAt = now + wait
+        }
+        // Gifts move under a still pointer, so keep checking whether one is there to click.
+        if hover == .gift || overlays.contains(where: { $0.scene.giftLayer.hasGifts }) {
+            updateMouseCapture()
+        }
     }
 
     private func applyEnergySettings() {
@@ -163,6 +206,7 @@ final class OverlayController: WindowTrackerObserver {
         for o in overlays {
             o.view.preferredFramesPerSecond = snowOff ? 15 : (save ? 20 : 30)
             o.scene.energySaving = save
+            o.scene.giftLayer.energySaving = save
         }
     }
 
@@ -180,7 +224,7 @@ final class OverlayController: WindowTrackerObserver {
     }
 
     /// Clicks normally pass straight through Nook. Only while the pointer is over a decoration
-    /// does that screen's layer catch the mouse, so you can grab it.
+    /// or a falling gift does that screen's layer catch the mouse, so you can grab or catch it.
     private func watchMouse() {
         let types: NSEvent.EventTypeMask = [.mouseMoved, .leftMouseDragged, .leftMouseUp, .scrollWheel]
         if let g = NSEvent.addGlobalMonitorForEvents(matching: types, handler: { [weak self] _ in self?.updateMouseCapture() }) {
@@ -196,14 +240,23 @@ final class OverlayController: WindowTrackerObserver {
     private func updateMouseCapture() {
         guard !DecorationInteraction.shared.isDragging else { return }
         let p = NSEvent.mouseLocation
-        let over = hasVisibleDecorations && DecorationStore.shared.hitTest(p) != nil
+        let overGift = giftsOn && overlays.contains {
+            $0.screen.frame.contains(p) && $0.window.isVisible && $0.scene.giftHit(atGlobal: p)
+        }
+        let overDecoration = !overGift && hasVisibleDecorations && DecorationStore.shared.hitTest(p) != nil
+        let over = overGift || overDecoration
         for o in overlays {
             let capture = over && o.screen.frame.contains(p) && o.window.isVisible
             if o.window.ignoresMouseEvents == capture { o.window.ignoresMouseEvents = !capture }
         }
-        if over != hoveringDecoration {
-            hoveringDecoration = over
-            (over ? NSCursor.openHand : NSCursor.arrow).set()
+        let now: Hover = overGift ? .gift : (overDecoration ? .decoration : .none)
+        if now != hover {
+            hover = now
+            switch now {
+            case .gift: NSCursor.pointingHand.set()
+            case .decoration: NSCursor.openHand.set()
+            case .none: NSCursor.arrow.set()
+            }
         }
     }
 
@@ -261,6 +314,7 @@ final class OverlayController: WindowTrackerObserver {
         let own = NSApp.windows.filter { $0.isVisible && !($0 is OverlayWindow) && $0.level.rawValue > Int(CGWindowLevelForKey(.desktopWindow)) }.map { $0.frame }
         for o in overlays {
             o.scene.ownWindowFrames = own
+            o.scene.giftLayer.dockRect = dockRect.map { o.scene.toLocal($0) }
             o.scene.windowsDidUpdate(windows, events: events, dockRect: dockRect)
         }
     }

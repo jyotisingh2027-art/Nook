@@ -73,7 +73,8 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         menu.removeAllItems()
         let settings = Settings.shared
 
-        let header = NSMenuItem(title: "Nook · Winter", action: nil, keyEquivalent: "")
+        let header = NSMenuItem(title: settings.mode == .catchGift ? "Nook · Winter · Catch the Gift" : "Nook · Winter",
+                                action: nil, keyEquivalent: "")
         header.isEnabled = false
         menu.addItem(header)
         menu.addItem(.separator())
@@ -92,6 +93,24 @@ final class StatusMenuController: NSObject, NSMenuDelegate {
         }
         modeItem.submenu = modeMenu
         menu.addItem(modeItem)
+
+        // Catch the Gift score
+        if settings.mode == .catchGift {
+            let stats = GiftStats.shared
+            var lines = ["Gifts caught: \(stats.caught)   ·   Best streak: \(stats.bestStreak)"]
+            if let left = stats.catchesToNextUnlock {
+                lines.append(left == 1 ? "Next surprise: 1 more catch" : "Next surprise: \(left) more catches")
+            } else {
+                lines.append("Every surprise unlocked!")
+            }
+            if settings.isPaused { lines.append("Resume the snow to keep playing") }
+            for line in lines {
+                let info = NSMenuItem(title: line, action: nil, keyEquivalent: "")
+                info.isEnabled = false
+                info.indentationLevel = 1
+                menu.addItem(info)
+            }
+        }
 
         // Wallpaper
         let wallItem = NSMenuItem(title: "Wallpaper", action: nil, keyEquivalent: "")

@@ -53,7 +53,7 @@ enum AppMode: String, CaseIterable {
     }
 
     /// Modes become available as they are built.
-    var isAvailable: Bool { self == .cozy }
+    var isAvailable: Bool { self == .cozy || self == .catchGift }
 }
 
 /// User preferences, stored locally on this Mac only.
