@@ -330,6 +330,7 @@ extension VisitorArt {
             [bunnyCrouch, bunnyHop, bunnySitUp],
             [shoveller(.walkA, outfit: o[0]), shoveller(.walkB, outfit: o[0]), shoveller(.scoop, outfit: o[1]),
              shoveller(.toss, outfit: o[2]), shoveller(.walkA, outfit: o[3])],
+            [FrostImpArt.texture(.flyA), FrostImpArt.texture(.flyB), FrostImpArt.texture(.grab), FrostImpArt.texture(.shooed)],
         ]
         let cell: CGFloat = 80, scale: CGFloat = 3
         let W = cell * 6, H = cell * CGFloat(rows.count)

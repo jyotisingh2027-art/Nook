@@ -21,6 +21,11 @@ if let i = CommandLine.arguments.firstIndex(of: "--render-winter"), i + 1 < Comm
     exit(0)
 }
 
+if let i = CommandLine.arguments.firstIndex(of: "--render-imp"), i + 1 < CommandLine.arguments.count {
+    FrostImpPreview.render(to: CommandLine.arguments[i + 1])
+    exit(0)
+}
+
 let app = NSApplication.shared
 let appDelegate = AppDelegate()
 app.delegate = appDelegate

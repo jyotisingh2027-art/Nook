@@ -22,6 +22,16 @@ final class GiftStats {
         set { defaults.set(newValue, forKey: "giftBestStreak") }
     }
 
+    /// Times you've chased the frost imp away, and gifts it got away with.
+    private(set) var impsShooed: Int {
+        get { defaults.integer(forKey: "impsShooed") }
+        set { defaults.set(newValue, forKey: "impsShooed") }
+    }
+    private(set) var giftsStolen: Int {
+        get { defaults.integer(forKey: "giftsStolen") }
+        set { defaults.set(newValue, forKey: "giftsStolen") }
+    }
+
     /// Catches in a row right now. Resets when a gift lands.
     private(set) var streak = 0
 
@@ -49,6 +59,18 @@ final class GiftStats {
     func recordMiss() {
         guard streak != 0 else { return }
         streak = 0
+        notify()
+    }
+
+    /// The imp made off with a gift: that ends the streak.
+    func recordStolen() {
+        giftsStolen += 1
+        streak = 0
+        notify()
+    }
+
+    func recordImpShooed() {
+        impsShooed += 1
         notify()
     }
 
